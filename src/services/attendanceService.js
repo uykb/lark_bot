@@ -3,52 +3,26 @@ const moment = require('moment');
 const { getAccessToken } = require('./authService');
 const { logger } = require('../utils/logger');
 
-// 获取考勤组用户列表
-async function getAttendanceGroupUsers() {
-  try {
-    const token = await getAccessToken();
-    
-    logger.info(`获取考勤组 ${process.env.ATTENDANCE_GROUP_ID} 的用户列表`);
-    
-    // 发送请求 - 修改API路径
-    const response = await axios({
-      method: 'get',
-      url: 'https://open.feishu.cn/open-apis/attendance/v1/users',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      params: {
-        attendance_group_id: process.env.ATTENDANCE_GROUP_ID,
-        page_size: 50
-      }
-    });
-    
-    if (response.data.code === 0) {
-      logger.info(`成功获取考勤组用户列表，共 ${response.data.data?.user_list?.length || 0} 个用户`);
-      return response.data.data?.user_list || [];
-    } else {
-      throw new Error(`获取考勤组用户列表失败: ${response.data.msg}`);
-    }
-  } catch (error) {
-    logger.error('获取考勤组用户列表出错:', error);
-    throw error;
-  }
-}
+// 硬编码的用户ID列表
+const FIXED_USER_IDS = [
+  "6f89cd8e", "1d883db7", "7b6f547g", "eg74b574", "b87fg83d", 
+  "43a5cade", "72a34568", "142ffbfb", "473ef9d9", "92af688b", 
+  "9ff6e6g9", "b99c86ge", "b7fda3fc", "5d5accf7", "92d8d942", 
+  "5c546878", "549dea55", "a875defc", "35ec3fca", "ceo", 
+  "5618c5ea", "a2gfcd83", "3b9884ae", "fdf39ge6", "43eafg37", 
+  "4e5dd38b", "31f69e2c", "b949eb58", "798489da", "2dff31cd", 
+  "9c1b56ag", "2d6ddg17", "b8cg86bc", "f6e1287e"
+];
 
 // 获取考勤统计数据
 async function getAttendanceStatsData() {
   try {
     const token = await getAccessToken();
     
-    // 获取考勤组用户列表
-    const userList = await getAttendanceGroupUsers();
-    const userIds = userList.map(user => user.user_id);
+    // 使用固定的用户ID列表
+    const userIds = FIXED_USER_IDS;
     
-    if (userIds.length === 0) {
-      logger.warn('考勤组中没有用户');
-      return { user_datas: [] };
-    }
+    logger.info(`使用固定用户ID列表，共 ${userIds.length} 个用户`);
     
     // 设置日期范围（示例：获取当前月的数据）
     const today = moment();
@@ -176,7 +150,6 @@ function processAttendanceStatsData(statsData) {
 }
 
 module.exports = {
-  getAttendanceGroupUsers,
   getAttendanceStatsData,
   processAttendanceStatsData,
   // 保留原有的导出
