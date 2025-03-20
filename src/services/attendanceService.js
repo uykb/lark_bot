@@ -10,26 +10,23 @@ async function getAttendanceGroupUsers() {
     
     logger.info(`获取考勤组 ${process.env.ATTENDANCE_GROUP_ID} 的用户列表`);
     
-    // 发送请求
+    // 发送请求 - 修改API路径
     const response = await axios({
       method: 'get',
-      url: 'https://open.feishu.cn/open-apis/attendance/v1/group/list_user',
+      url: 'https://open.feishu.cn/open-apis/attendance/v1/users',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       params: {
-        group_id: process.env.ATTENDANCE_GROUP_ID,
-        employee_type: 'employee_id',
-        dept_type: 'open_id',
-        page_size: 50,
-        member_clock_type: 1
+        attendance_group_id: process.env.ATTENDANCE_GROUP_ID,
+        page_size: 50
       }
     });
     
     if (response.data.code === 0) {
-      logger.info(`成功获取考勤组用户列表，共 ${response.data.data.users?.length || 0} 个用户`);
-      return response.data.data.users || [];
+      logger.info(`成功获取考勤组用户列表，共 ${response.data.data?.user_list?.length || 0} 个用户`);
+      return response.data.data?.user_list || [];
     } else {
       throw new Error(`获取考勤组用户列表失败: ${response.data.msg}`);
     }
