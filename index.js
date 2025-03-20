@@ -11,8 +11,14 @@ async function main() {
     logger.info('开始获取考勤数据...');
     const attendanceData = await getAttendanceData();
     
+    // 添加详细日志
+    logger.debug('获取到的原始考勤数据', attendanceData);
+    
     logger.info('处理考勤数据...');
     const processedData = processAttendanceData(attendanceData);
+    
+    // 添加详细日志
+    logger.debug('处理后的考勤数据', processedData);
     
     // 确保数据结构完整
     if (!processedData.departmentStats) {
@@ -26,7 +32,10 @@ async function main() {
     }
     
     logger.info('通过Webhook发送考勤统计消息...');
-    await sendMessageViaWebhook(processedData);
+    const response = await sendMessageViaWebhook(processedData);
+    
+    // 添加详细日志
+    logger.debug('消息发送响应', response);
     
     logger.info('考勤统计任务完成');
   } catch (error) {

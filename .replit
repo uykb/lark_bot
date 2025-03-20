@@ -3,6 +3,10 @@ entrypoint = "index.js"
 
 [env]
 NODE_ENV = "production"
+USE_TEST_DATA = "true"
+TEST_ERROR_TYPE = "none"  # 可选值: none, empty_data, invalid_structure, api_error
+LOG_LEVEL = "debug"       # 可选值: debug, info, warn, error
+SHOW_DETAILED_LOGS = "true"
 
 [nix]
 channel = "stable-22_11"

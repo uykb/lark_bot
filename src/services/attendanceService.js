@@ -20,7 +20,42 @@ async function getAttendanceRecords() {
     // 检查是否使用测试数据
     if (process.env.USE_TEST_DATA === 'true') {
       logger.info('使用测试数据模式');
-      return generateTestData();
+      
+      // 检查是否需要模拟错误
+      const errorType = process.env.TEST_ERROR_TYPE || 'none';
+      logger.info(`错误模拟类型: ${errorType}`);
+      
+      switch (errorType) {
+        case 'empty_data':
+          logger.warn('模拟空数据情况');
+          return {
+            title: '打卡记录排行榜',
+            period: {
+              start: moment().subtract(30, 'days').format('YYYY-MM-DD'),
+              end: moment().format('YYYY-MM-DD')
+            },
+            departmentStats: {},
+            rankingData: [],
+            message: '模拟的空数据情况'
+          };
+          
+        case 'invalid_structure':
+          logger.warn('模拟数据结构不完整情况');
+          return {
+            title: '打卡记录排行榜',
+            // 缺少 period 字段
+            departmentStats: {}, // 空对象
+            // 缺少 rankingData 字段
+            message: '模拟的数据结构不完整情况'
+          };
+          
+        case 'api_error':
+          logger.warn('模拟API调用失败情况');
+          throw new Error('模拟的API调用失败');
+          
+        default:
+          return generateTestData();
+      }
     }
     
     const token = await getAccessToken();
