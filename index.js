@@ -38,3 +38,15 @@ scheduleJob(cronSchedule, () => {
 });
 
 logger.info('飞书考勤统计机器人已启动');
+
+// 添加自我 ping 逻辑以保持 Replit 项目运行
+const axios = require('axios');
+const REPLIT_URL = process.env.REPLIT_URL; // 在 Secrets 中设置你的 Replit URL
+
+if (REPLIT_URL) {
+  setInterval(() => {
+    axios.get(REPLIT_URL)
+      .then(() => console.log('Self-ping successful'))
+      .catch(err => console.error('Self-ping failed:', err.message));
+  }, 5 * 60 * 1000); // 每5分钟 ping 一次
+}

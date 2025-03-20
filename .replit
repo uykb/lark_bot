@@ -1,5 +1,4 @@
 run = "npm start"
-language = "nodejs"
 entrypoint = "index.js"
 
 [env]
@@ -13,22 +12,11 @@ language = "nodejs"
   [packager.features]
   packageSearch = true
   guessImports = true
-  enabledForHosting = true
+  enabledForHosting = false
 
-[unitTest]
-language = "nodejs"
+[languages.js]
+pattern = "**/*.js"
+syntax = "javascript"
 
-[languages]
-  [languages.javascript]
-  pattern = "**/{*.js,*.jsx,*.ts,*.tsx}"
-    [languages.javascript.languageServer]
-    start = "typescript-language-server --stdio"
-
-[cron]
-enabled = true
-schedule = "0 1 * * 1"  # 每周一上午9:00（北京时间，对应UTC+8，即UTC时间1:00）
-
-[deployment]
-run = ["sh", "-c", "npm start"]
-deploymentTarget = "cloudrun"
-ignorePorts = false
+[languages.js.languageServer]
+start = [ "typescript-language-server", "--stdio" ]
