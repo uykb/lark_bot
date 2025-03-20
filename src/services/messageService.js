@@ -38,6 +38,34 @@ async function sendMessageViaWebhook(data) {
   }
 }
 
+// 生成文本内容
+function generateTextContent(data) {
+  const { period, departmentStats, rankingData } = data;
+  
+  let text = `📊 考勤统计报告\n`;
+  text += `统计周期: ${period.start} 至 ${period.end}\n\n`;
+  
+  // 部门统计
+  text += `🏢 部门统计:\n`;
+  Object.values(departmentStats).forEach(dept => {
+    text += `${dept.departmentName}:\n`;
+    text += `  准时: ${dept.totalOnTimeCount} 次\n`;
+    text += `  迟到: ${dept.totalLateCount} 次\n\n`;
+  });
+  
+  // 早起排名
+  text += `🌅 早起排名:\n`;
+  const earlyRanking = rankingData
+    .filter(r => !r.isLate)
+    .slice(0, 10);
+  
+  earlyRanking.forEach((record, index) => {
+    text += `${index + 1}. ${record.userName} - ${record.checkInTime}\n`;
+  });
+  
+  return text;
+}
+
 // 保留原有的sendMessage函数以保持兼容性
 async function sendMessage(data) {
   return sendMessageViaWebhook(data);
@@ -45,7 +73,8 @@ async function sendMessage(data) {
 
 module.exports = {
   sendMessage,
-  sendMessageViaWebhook
+  sendMessageViaWebhook,
+  generateTextContent
 };
 const { getAccessToken } = require('./authService');
 const { logger } = require('../utils/logger');
