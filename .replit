@@ -3,9 +3,8 @@ entrypoint = "index.js"
 
 [env]
 NODE_ENV = "production"
-USE_TEST_DATA = "true"
-TEST_ERROR_TYPE = "none"  # 可选值: none, empty_data, invalid_structure, api_error
-LOG_LEVEL = "debug"       # 可选值: debug, info, warn, error
+USE_TEST_DATA = "false"  # 修改为false，关闭测试数据
+LOG_LEVEL = "debug"      # 保持debug级别以便查看详细日志
 SHOW_DETAILED_LOGS = "true"
 
 [nix]

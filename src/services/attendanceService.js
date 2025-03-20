@@ -58,6 +58,7 @@ async function getAttendanceRecords() {
       }
     }
     
+    logger.info('使用真实数据模式，开始API查询');
     const token = await getAccessToken();
     
     // 使用固定的用户ID列表
@@ -99,19 +100,39 @@ async function getAttendanceRecords() {
     });
     
     if (response.data.code === 0) {
-      logger.info(`成功获取打卡记录数据，响应: ${JSON.stringify(response.data)}`);
+      logger.info(`成功获取打卡记录数据`);
+      logger.debug('API响应详情', response.data);
       
       // 检查返回的数据结构
       if (!response.data.data || !response.data.data.user_task_results || response.data.data.user_task_results.length === 0) {
-        logger.warn('API返回的数据为空或结构不完整，使用测试数据');
-        return generateTestData();
+        logger.warn('API返回的数据为空或结构不完整');
+        // 不使用测试数据，而是返回空结构
+        return {
+          title: '打卡记录排行榜',
+          period: {
+            start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
+            end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
+          },
+          departmentStats: {},
+          rankingData: [],
+          message: 'API返回的数据为空或结构不完整'
+        };
       }
       
       return processAttendanceRecords(response.data.data);
     } else {
       logger.error(`获取打卡记录数据失败: ${response.data.msg}, 错误码: ${response.data.code}`);
-      logger.info('使用测试数据作为备选');
-      return generateTestData();
+      // 不使用测试数据，而是返回错误信息
+      return {
+        title: '打卡记录获取失败',
+        period: {
+          start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
+          end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
+        },
+        departmentStats: {},
+        rankingData: [],
+        message: `获取打卡记录数据失败: ${response.data.msg}, 错误码: ${response.data.code}`
+      };
     }
   } catch (error) {
     logger.error('获取打卡记录数据出错:', error);
@@ -122,8 +143,17 @@ async function getAttendanceRecords() {
       logger.error(`响应数据: ${JSON.stringify(error.response.data)}`);
     }
     
-    logger.info('使用测试数据作为备选');
-    return generateTestData();
+    // 不使用测试数据，而是返回错误信息
+    return {
+      title: '打卡记录查询出错',
+      period: {
+        start: moment().subtract(30, 'days').format('YYYY-MM-DD'),
+        end: moment().format('YYYY-MM-DD')
+      },
+      departmentStats: {},
+      rankingData: [],
+      message: `获取数据失败: ${error.message}`
+    };
   }
 }
 

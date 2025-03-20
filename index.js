@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { scheduleJob } = require('node-schedule');
 const { getAttendanceData, processAttendanceData } = require('./src/services/attendanceService');
-const { sendMessageViaWebhook } = require('./src/services/messageService');
+const { sendMessageViaWebhook, sendMessageViaAPI } = require('./src/services/messageService');
 const { logger } = require('./src/utils/logger');
 const { getCronSchedule } = require('./src/config/cronConfig');
 
@@ -9,6 +9,7 @@ const { getCronSchedule } = require('./src/config/cronConfig');
 async function main() {
   try {
     logger.info('开始获取考勤数据...');
+    logger.info('使用真实数据模式，直接查询API');
     const attendanceData = await getAttendanceData();
     
     // 添加详细日志
@@ -31,11 +32,16 @@ async function main() {
       processedData.rankingData = [];
     }
     
-    logger.info('通过Webhook发送考勤统计消息...');
-    const response = await sendMessageViaWebhook(processedData);
-    
-    // 添加详细日志
-    logger.debug('消息发送响应', response);
+    // 根据配置选择发送方式
+    if (process.env.WEBHOOK_URL) {
+      logger.info('通过Webhook发送考勤统计消息...');
+      const response = await sendMessageViaWebhook(processedData);
+      logger.debug('消息发送响应', response);
+    } else {
+      logger.info('通过API发送考勤统计消息...');
+      const response = await sendMessageViaAPI(processedData);
+      logger.debug('消息发送响应', response);
+    }
     
     logger.info('考勤统计任务完成');
   } catch (error) {
