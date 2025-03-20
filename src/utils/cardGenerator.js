@@ -2,7 +2,15 @@ const moment = require('moment');
 
 // 生成卡片内容
 function generateCardContent(data) {
-  const { period, departmentStats, rankingData } = data;
+  // 确保数据结构完整
+  const period = data.period || {
+    start: moment().startOf('month').format('YYYY-MM-DD'),
+    end: moment().format('YYYY-MM-DD')
+  };
+  
+  const departmentStats = data.departmentStats || {};
+  const rankingData = data.rankingData || [];
+  
   const messageTitle = process.env.MESSAGE_TITLE || '📊 考勤统计报告';
   
   // 构建卡片
@@ -66,6 +74,17 @@ function generateCardContent(data) {
 
 // 生成部门统计元素
 function generateDepartmentElements(departmentStats) {
+  // 如果没有部门数据，返回提示信息
+  if (!departmentStats || Object.keys(departmentStats).length === 0) {
+    return [{
+      "tag": "div",
+      "text": {
+        "tag": "plain_text",
+        "content": "暂无部门统计数据"
+      }
+    }];
+  }
+  
   const elements = [];
   
   Object.values(departmentStats).forEach(dept => {
@@ -90,7 +109,7 @@ function generateDepartmentElements(departmentStats) {
     });
     
     // 如果需要显示部门内的用户详情
-    if (process.env.GROUP_BY_DEPARTMENT === 'true') {
+    if (process.env.GROUP_BY_DEPARTMENT === 'true' && dept.users && dept.users.length > 0) {
       dept.users.forEach(user => {
         elements.push({
           "tag": "div",
@@ -120,6 +139,17 @@ function generateDepartmentElements(departmentStats) {
 
 // 生成早起排名元素
 function generateEarlyRankingElements(rankingData) {
+  // 如果没有排名数据，返回提示信息
+  if (!rankingData || rankingData.length === 0) {
+    return [{
+      "tag": "div",
+      "text": {
+        "tag": "plain_text",
+        "content": "暂无早起排名数据"
+      }
+    }];
+  }
+  
   const elements = [];
   const rankingLimit = parseInt(process.env.RANKING_LIMIT || '10');
   

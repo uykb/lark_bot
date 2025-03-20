@@ -14,6 +14,17 @@ async function main() {
     logger.info('处理考勤数据...');
     const processedData = processAttendanceData(attendanceData);
     
+    // 确保数据结构完整
+    if (!processedData.departmentStats) {
+      logger.warn('处理后的数据缺少 departmentStats 字段，将添加空对象');
+      processedData.departmentStats = {};
+    }
+    
+    if (!processedData.rankingData) {
+      logger.warn('处理后的数据缺少 rankingData 字段，将添加空数组');
+      processedData.rankingData = [];
+    }
+    
     logger.info('发送考勤统计消息...');
     await sendMessage(processedData);
     
