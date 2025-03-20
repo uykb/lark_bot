@@ -151,31 +151,100 @@ function generateEarlyRankingElements(rankingData) {
   }
   
   const elements = [];
-  const rankingLimit = parseInt(process.env.RANKING_LIMIT || '10');
+  const rankingLimit = 5; // 显示前5名和后5名
   
-  // 过滤出非迟到记录并按打卡时间排序
-  const earlyRanking = rankingData
-    .filter(r => !r.isLate)
-    .sort((a, b) => {
-      if (a.date !== b.date) {
-        return moment(a.date).diff(moment(b.date));
-      }
-      return moment(a.checkInTime, 'HH:mm:ss').diff(moment(b.checkInTime, 'HH:mm:ss'));
-    })
-    .slice(0, rankingLimit);
+  // 按用户分组，计算每个用户的平均打卡时间
+  const userCheckInMap = {};
   
-  // 生成排名表格
-  const tableRows = earlyRanking.map((record, index) => {
-    return `| ${index + 1} | ${record.userName} | ${record.checkInTime} | ${record.date} |`;
-  }).join('\n');
-  
-  elements.push({
-    "tag": "div",
-    "text": {
-      "tag": "lark_md",
-      "content": `| 排名 | 姓名 | 打卡时间 | 日期 |\n| --- | --- | --- | --- |\n${tableRows}`
+  rankingData.forEach(record => {
+    if (record.isLate) return; // 跳过迟到记录
+    
+    if (!userCheckInMap[record.userId]) {
+      userCheckInMap[record.userId] = {
+        userId: record.userId,
+        userName: record.userName,
+        department: record.department,
+        checkInTimes: [],
+        dates: []
+      };
+    }
+    
+    // 只记录每天第一次打卡
+    const dateExists = userCheckInMap[record.userId].dates.includes(record.date);
+    if (!dateExists) {
+      userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
+      userCheckInMap[record.userId].dates.push(record.date);
     }
   });
+  
+  // 计算平均打卡时间
+  const userAverages = Object.values(userCheckInMap).map(user => {
+    if (user.checkInTimes.length === 0) return null;
+    
+    // 计算平均时间（转换为分钟后计算）
+    const totalMinutes = user.checkInTimes.reduce((sum, time) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return sum + (hours * 60 + minutes);
+    }, 0);
+    
+    const avgMinutes = totalMinutes / user.checkInTimes.length;
+    const avgHours = Math.floor(avgMinutes / 60);
+    const avgMins = Math.floor(avgMinutes % 60);
+    
+    return {
+      userId: user.userId,
+      userName: user.userName,
+      department: user.department,
+      avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`,
+      checkInCount: user.checkInTimes.length,
+      totalMinutes: avgMinutes // 用于排序
+    };
+  }).filter(Boolean);
+  
+  // 按平均打卡时间排序
+  userAverages.sort((a, b) => a.totalMinutes - b.totalMinutes);
+  
+  // 获取前5名和后5名
+  const topFive = userAverages.slice(0, rankingLimit);
+  const bottomFive = userAverages.length > rankingLimit ? 
+    userAverages.slice(-rankingLimit) : [];
+  
+  // 生成前5名表格
+  if (topFive.length > 0) {
+    const topRows = topFive.map((user, index) => {
+      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
+    }).join('\n');
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": `**前${rankingLimit}名早起之星**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${topRows}`
+      }
+    });
+  }
+  
+  // 添加分隔线
+  if (topFive.length > 0 && bottomFive.length > 0) {
+    elements.push({
+      "tag": "hr"
+    });
+  }
+  
+  // 生成后5名表格
+  if (bottomFive.length > 0) {
+    const bottomRows = bottomFive.map((user, index) => {
+      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
+    }).join('\n');
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": `**最后${rankingLimit}名**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${bottomRows}`
+      }
+    });
+  }
   
   return elements;
 }

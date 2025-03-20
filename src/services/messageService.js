@@ -47,21 +47,90 @@ function generateTextContent(data) {
   
   // 部门统计
   text += `🏢 部门统计:\n`;
-  Object.values(departmentStats).forEach(dept => {
-    text += `${dept.departmentName}:\n`;
-    text += `  准时: ${dept.totalOnTimeCount} 次\n`;
-    text += `  迟到: ${dept.totalLateCount} 次\n\n`;
-  });
+  if (Object.keys(departmentStats).length === 0) {
+    text += `暂无部门统计数据\n\n`;
+  } else {
+    Object.values(departmentStats).forEach(dept => {
+      text += `${dept.departmentName}:\n`;
+      text += `  准时: ${dept.totalOnTimeCount} 次\n`;
+      text += `  迟到: ${dept.totalLateCount} 次\n\n`;
+    });
+  }
   
   // 早起排名
   text += `🌅 早起排名:\n`;
-  const earlyRanking = rankingData
-    .filter(r => !r.isLate)
-    .slice(0, 10);
   
-  earlyRanking.forEach((record, index) => {
-    text += `${index + 1}. ${record.userName} - ${record.checkInTime}\n`;
+  // 按用户分组，计算每个用户的平均打卡时间
+  const userCheckInMap = {};
+  
+  rankingData.forEach(record => {
+    if (record.isLate) return; // 跳过迟到记录
+    
+    if (!userCheckInMap[record.userId]) {
+      userCheckInMap[record.userId] = {
+        userId: record.userId,
+        userName: record.userName,
+        checkInTimes: [],
+        dates: []
+      };
+    }
+    
+    // 只记录每天第一次打卡
+    const dateExists = userCheckInMap[record.userId].dates.includes(record.date);
+    if (!dateExists) {
+      userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
+      userCheckInMap[record.userId].dates.push(record.date);
+    }
   });
+  
+  // 计算平均打卡时间
+  const userAverages = Object.values(userCheckInMap).map(user => {
+    if (user.checkInTimes.length === 0) return null;
+    
+    // 计算平均时间（转换为分钟后计算）
+    const totalMinutes = user.checkInTimes.reduce((sum, time) => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return sum + (hours * 60 + minutes);
+    }, 0);
+    
+    const avgMinutes = totalMinutes / user.checkInTimes.length;
+    const avgHours = Math.floor(avgMinutes / 60);
+    const avgMins = Math.floor(avgMinutes % 60);
+    
+    return {
+      userId: user.userId,
+      userName: user.userName,
+      avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`,
+      checkInCount: user.checkInTimes.length,
+      totalMinutes: avgMinutes // 用于排序
+    };
+  }).filter(Boolean);
+  
+  // 按平均打卡时间排序
+  userAverages.sort((a, b) => a.totalMinutes - b.totalMinutes);
+  
+  const rankingLimit = 5;
+  
+  // 获取前5名和后5名
+  const topFive = userAverages.slice(0, rankingLimit);
+  const bottomFive = userAverages.length > rankingLimit ? 
+    userAverages.slice(-rankingLimit) : [];
+  
+  if (topFive.length === 0) {
+    text += `暂无早起排名数据\n\n`;
+  } else {
+    text += `前${rankingLimit}名早起之星:\n`;
+    topFive.forEach((user, index) => {
+      text += `${index + 1}. ${user.userName} - ${user.avgCheckInTime} (${user.checkInCount}天)\n`;
+    });
+    
+    if (bottomFive.length > 0) {
+      text += `\n最后${rankingLimit}名:\n`;
+      bottomFive.forEach((user, index) => {
+        text += `${userAverages.length - rankingLimit + index + 1}. ${user.userName} - ${user.avgCheckInTime} (${user.checkInCount}天)\n`;
+      });
+    }
+  }
   
   return text;
 }
