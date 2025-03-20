@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { scheduleJob } = require('node-schedule');
 const { getAttendanceData, processAttendanceData } = require('./src/services/attendanceService');
-const { sendMessage } = require('./src/services/messageService');
+const { sendMessageViaWebhook } = require('./src/services/messageService');
 const { logger } = require('./src/utils/logger');
 const { getCronSchedule } = require('./src/config/cronConfig');
 
@@ -25,8 +25,8 @@ async function main() {
       processedData.rankingData = [];
     }
     
-    logger.info('发送考勤统计消息...');
-    await sendMessage(processedData);
+    logger.info('通过Webhook发送考勤统计消息...');
+    await sendMessageViaWebhook(processedData);
     
     logger.info('考勤统计任务完成');
   } catch (error) {
