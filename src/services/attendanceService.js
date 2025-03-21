@@ -3,8 +3,20 @@ const moment = require('moment');
 const { getAccessToken } = require('./authService');
 const { logger } = require('../utils/logger');
 
-// 从配置文件中导入用户ID列表
-const { USER_IDS } = require('../config/userConfig');
+// 从环境变量中获取用户ID列表
+function getUserIds() {
+  const userIdsStr = process.env.USER_IDS;
+  if (!userIdsStr) {
+    logger.error('环境变量USER_IDS未设置');
+    return [];
+  }
+  try {
+    return userIdsStr.split(',').map(id => id.trim()).filter(id => id);
+  } catch (error) {
+    logger.error('解析USER_IDS环境变量失败:', error);
+    return [];
+  }
+}
 
 // 获取考勤统计数据
 async function getAttendanceStats() {
@@ -30,8 +42,22 @@ async function getAttendanceStats() {
       };
     }
     
-    // 使用配置文件中的用户ID列表
-    const userIds = USER_IDS;
+    // 从环境变量获取用户ID列表
+    const userIds = getUserIds();
+    
+    // 检查是否成功获取用户ID列表
+    if (userIds.length === 0) {
+      return {
+        title: '考勤统计获取失败',
+        period: {
+          start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
+          end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
+        },
+        departmentStats: {},
+        rankingData: [],
+        message: '未配置用户ID列表，请在环境变量中设置USER_IDS'
+      };
+    }
     
     logger.info(`获取考勤统计，共 ${userIds.length} 个用户`);
     
