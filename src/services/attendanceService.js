@@ -211,6 +211,14 @@ function processAttendanceRecords(recordsData) {
             // 判断是否迟到
             const isLate = record.check_in_result === 'Late';
             
+            // 获取小时和分钟，用于判断是否在6:30-8:30之间
+            const hours = checkInMoment.hours();
+            const minutes = checkInMoment.minutes();
+            const totalMinutes = hours * 60 + minutes;
+            
+            // 判断是否在早上6:30-8:30之间 (6:30 = 390分钟, 8:30 = 510分钟)
+            const isInMorningRange = totalMinutes >= 390 && totalMinutes <= 510;
+            
             // 添加记录
             allRecords.push({
               date: checkInDate,
@@ -221,10 +229,12 @@ function processAttendanceRecords(recordsData) {
               status: record.check_in_result || '未知',
               location: record.check_in_record.location_name || '未知',
               isLate: isLate,
-              department: department
+              department: department,
+              isInMorningRange: isInMorningRange, // 添加是否在早上时间范围内的标记
+              totalMinutes: totalMinutes // 添加总分钟数用于排序
             });
             
-            logger.debug(`添加打卡记录: ${checkInDate} ${checkInTimeFormatted} - ${userName}`);
+            logger.debug(`添加打卡记录: ${checkInDate} ${checkInTimeFormatted} - ${userName} - 在早上6:30-8:30范围内: ${isInMorningRange}`);
           } catch (recordError) {
             logger.warn(`处理单条打卡记录时出错: ${recordError.message}`, recordError);
             // 继续处理下一条记录
@@ -300,7 +310,7 @@ function processAttendanceRecords(recordsData) {
     
     // 构建最终结果
     const result = {
-      title: '打卡记录排行榜',
+      title: '早上6:30-8:30打卡记录排行榜', // 修改标题
       period: {
         start: startDate,
         end: endDate
@@ -311,7 +321,8 @@ function processAttendanceRecords(recordsData) {
         totalDays: [...new Set(allRecords.map(r => r.date))].length,
         totalRecords: allRecords.length,
         totalOnTime: allRecords.filter(r => !r.isLate).length,
-        totalLate: allRecords.filter(r => r.isLate).length
+        totalLate: allRecords.filter(r => r.isLate).length,
+        totalInMorningRange: allRecords.filter(r => r.isInMorningRange).length // 添加早上时间范围内的记录数
       }
     };
     

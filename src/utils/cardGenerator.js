@@ -157,7 +157,8 @@ function generateEarlyRankingElements(rankingData) {
   const userCheckInMap = {};
   
   rankingData.forEach(record => {
-    if (record.isLate) return; // 跳过迟到记录
+    // 只处理早上6:30-8:30之间的打卡记录
+    if (!record.isInMorningRange) return; // 跳过不在早上时间范围内的记录
     
     if (!userCheckInMap[record.userId]) {
       userCheckInMap[record.userId] = {
@@ -219,7 +220,7 @@ function generateEarlyRankingElements(rankingData) {
       "tag": "div",
       "text": {
         "tag": "lark_md",
-        "content": `**前${rankingLimit}名早起之星**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${topRows}`
+        "content": `**前${rankingLimit}名早起之星 (6:30-8:30)**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${topRows}`
       }
     });
   }
@@ -241,7 +242,7 @@ function generateEarlyRankingElements(rankingData) {
       "tag": "div",
       "text": {
         "tag": "lark_md",
-        "content": `**最后${rankingLimit}名**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${bottomRows}`
+        "content": `**最后${rankingLimit}名 (6:30-8:30)**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${bottomRows}`
       }
     });
   }

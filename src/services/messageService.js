@@ -42,7 +42,7 @@ async function sendMessageViaWebhook(data) {
 function generateTextContent(data) {
   const { period, departmentStats, rankingData } = data;
   
-  let text = `📊 考勤统计报告\n`;
+  let text = `📊 早上6:30-8:30打卡记录排行榜\n`;
   text += `统计周期: ${period.start} 至 ${period.end}\n\n`;
   
   // 部门统计
@@ -58,13 +58,14 @@ function generateTextContent(data) {
   }
   
   // 早起排名
-  text += `🌅 早起排名:\n`;
+  text += `🌅 早起排名 (6:30-8:30):\n`;
   
   // 按用户分组，计算每个用户的平均打卡时间
   const userCheckInMap = {};
   
   rankingData.forEach(record => {
-    if (record.isLate) return; // 跳过迟到记录
+    // 只处理早上6:30-8:30之间的打卡记录
+    if (!record.isInMorningRange) return; // 跳过不在早上时间范围内的记录
     
     if (!userCheckInMap[record.userId]) {
       userCheckInMap[record.userId] = {
