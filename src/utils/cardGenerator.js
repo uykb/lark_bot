@@ -172,7 +172,8 @@ function generateEarlyRankingElements(rankingData) {
         department: record.department,
         checkInTimes: [],
         dates: [],
-        lateCount: 0 // 添加迟到次数统计
+        lateCount: 0, // 添加迟到次数统计
+        lateDates: [] // 添加迟到日期记录
       };
     }
     
@@ -187,6 +188,7 @@ function generateEarlyRankingElements(rankingData) {
         const [hours, minutes] = record.checkInTime.split(':').map(Number);
         if (hours > 8 || (hours === 8 && minutes > 0)) {
           userCheckInMap[record.userId].lateCount++;
+          userCheckInMap[record.userId].lateDates.push(record.date); // 记录迟到日期
         }
       }
     }
@@ -291,6 +293,38 @@ function generateEarlyRankingElements(rankingData) {
       "text": {
         "tag": "lark_md",
         "content": `**迟到次数前${rankingLimit}名**\n| 排名 | 姓名 | 部门 | 迟到次数 |\n| --- | --- | --- | --- |\n${lateRows}`
+      }
+    });
+  }
+  
+  // 添加上周迟到人员名单
+  const lateUsers = userAverages.filter(user => user.lateCount > 0);
+  
+  if (lateUsers.length > 0) {
+    elements.push({
+      "tag": "hr"
+    });
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "### 📋 上周迟到人员名单"
+      }
+    });
+    
+    // 按迟到次数从多到少排序
+    lateUsers.sort((a, b) => b.lateCount - a.lateCount);
+    
+    const lateListRows = lateUsers.map((user, index) => {
+      return `| ${index + 1} | ${user.userName} | ${user.department} | ${user.lateCount} | ${user.lateDates ? user.lateDates.join(', ') : '未记录'} |`;
+    }).join('\n');
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": `**迟到人员列表 (按迟到次数排序)**\n| 序号 | 姓名 | 部门 | 迟到次数 | 迟到日期 |\n| --- | --- | --- | --- | --- |\n${lateListRows}`
       }
     });
   }
