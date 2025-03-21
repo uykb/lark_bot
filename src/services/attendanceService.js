@@ -385,11 +385,9 @@ module.exports = {
   processAttendanceStatsData: processAttendanceStats
 };
 
-// 3. 性能优化
+/* Performance optimization functions below */
 
-针对大量用户ID的情况，可以考虑分批请求：
-
-// 分批处理用户ID
+// Batch processing for large number of user IDs
 async function getAttendanceStatsInBatches() {
   try {
     logger.info('使用考勤统计API查询数据（分批处理）');
