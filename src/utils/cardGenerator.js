@@ -87,50 +87,31 @@ function generateDepartmentElements(departmentStats) {
   
   const elements = [];
   
-  Object.values(departmentStats).forEach(dept => {
-    elements.push({
-      "tag": "div",
-      "fields": [
-        {
-          "is_short": true,
-          "text": {
-            "tag": "lark_md",
-            "content": `**${dept.departmentName}**`
-          }
-        },
-        {
-          "is_short": true,
-          "text": {
-            "tag": "lark_md",
-            "content": `准时: ${dept.totalOnTimeCount} 次 | 迟到: ${dept.totalLateCount} 次`
-          }
-        }
-      ]
-    });
-    
-    // 如果需要显示部门内的用户详情
-    if (process.env.GROUP_BY_DEPARTMENT === 'true' && dept.users && dept.users.length > 0) {
-      dept.users.forEach(user => {
-        elements.push({
-          "tag": "div",
-          "fields": [
-            {
-              "is_short": true,
-              "text": {
-                "tag": "lark_md",
-                "content": `${user.userName}`
-              }
-            },
-            {
-              "is_short": true,
-              "text": {
-                "tag": "lark_md",
-                "content": `准时: ${user.onTimeCount} | 迟到: ${user.lateCount}`
-              }
-            }
-          ]
-        });
-      });
+  // 计算每个部门的准时率并排序
+  const departmentRanking = Object.values(departmentStats)
+    .map(dept => {
+      const totalCount = dept.totalOnTimeCount + dept.totalLateCount;
+      const onTimeRate = totalCount > 0 ? (dept.totalOnTimeCount / totalCount * 100).toFixed(1) : 0;
+      return {
+        departmentName: dept.departmentName,
+        totalOnTimeCount: dept.totalOnTimeCount,
+        totalLateCount: dept.totalLateCount,
+        onTimeRate: parseFloat(onTimeRate)
+      };
+    })
+    .sort((a, b) => b.onTimeRate - a.onTimeRate)
+    .slice(0, 5); // 只取前5名
+
+  // 生成部门排名表格
+  const rows = departmentRanking.map((dept, index) => {
+    return `| ${index + 1} | ${dept.departmentName} | ${dept.onTimeRate}% | ${dept.totalOnTimeCount} | ${dept.totalLateCount} |`;
+  }).join('\n');
+
+  elements.push({
+    "tag": "div",
+    "text": {
+      "tag": "lark_md",
+      "content": `**部门准时率排名前五**\n| 排名 | 部门 | 准时率 | 准时次数 | 迟到次数 |\n| --- | --- | --- | --- | --- |\n${rows}`
     }
   });
   
