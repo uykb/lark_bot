@@ -193,6 +193,18 @@ function processAttendanceRecords(recordsData) {
                 logger.warn(`无效的打卡时间戳: ${record.check_in_record.check_time}`);
                 return; // 跳过这条记录
               }
+              
+              // 添加调试信息，输出原始时间戳和转换后的时间
+              logger.debug(`原始时间戳: ${checkInTime}, 转换后时间: ${moment.unix(checkInTime).format('YYYY-MM-DD HH:mm:ss')}`);
+              
+              // 检查时间戳是否为毫秒级（如果是毫秒级，转换为秒级）
+              if (checkInTime > 10000000000) { // 大于10位数可能是毫秒级时间戳
+                logger.debug(`检测到毫秒级时间戳，转换为秒级`);
+                checkInTime = Math.floor(checkInTime / 1000);
+              }
+              
+              // 再次输出转换后的时间进行确认
+              logger.debug(`处理后时间戳: ${checkInTime}, 转换后时间: ${moment.unix(checkInTime).format('YYYY-MM-DD HH:mm:ss')}`);
             } catch (e) {
               logger.warn(`解析打卡时间戳出错: ${e.message}`);
               return; // 跳过这条记录
@@ -208,9 +220,6 @@ function processAttendanceRecords(recordsData) {
             const checkInDate = checkInMoment.format('YYYY-MM-DD');
             const checkInTimeFormatted = checkInMoment.format('HH:mm:ss');
             
-            // 判断是否迟到
-            const isLate = record.check_in_result === 'Late';
-            
             // 获取小时和分钟，用于判断是否在6:30-8:30之间
             const hours = checkInMoment.hours();
             const minutes = checkInMoment.minutes();
@@ -218,6 +227,12 @@ function processAttendanceRecords(recordsData) {
             
             // 判断是否在早上6:30-8:30之间 (6:30 = 390分钟, 8:30 = 510分钟)
             const isInMorningRange = totalMinutes >= 390 && totalMinutes <= 510;
+            
+            // 添加更多调试信息
+            logger.debug(`用户 ${userName} 打卡时间: ${checkInTimeFormatted}, 小时: ${hours}, 分钟: ${minutes}, 总分钟: ${totalMinutes}, 是否在范围内: ${isInMorningRange}`);
+            
+            // 判断是否迟到
+            const isLate = record.check_in_result === 'Late';
             
             // 添加记录
             allRecords.push({
@@ -230,8 +245,8 @@ function processAttendanceRecords(recordsData) {
               location: record.check_in_record.location_name || '未知',
               isLate: isLate,
               department: department,
-              isInMorningRange: isInMorningRange, // 添加是否在早上时间范围内的标记
-              totalMinutes: totalMinutes // 添加总分钟数用于排序
+              isInMorningRange: isInMorningRange,
+              totalMinutes: totalMinutes
             });
             
             logger.debug(`添加打卡记录: ${checkInDate} ${checkInTimeFormatted} - ${userName} - 在早上6:30-8:30范围内: ${isInMorningRange}`);
@@ -246,6 +261,24 @@ function processAttendanceRecords(recordsData) {
     });
     
     logger.info(`共处理了 ${allRecords.length} 条打卡记录`);
+
+    // 统计在早上6:30-8:30范围内的记录数
+    const morningRangeRecords = allRecords.filter(r => r.isInMorningRange);
+    logger.info(`其中早上6:30-8:30范围内的记录有 ${morningRangeRecords.length} 条`);
+
+    // 统计每个用户在早上6:30-8:30范围内的记录数
+    const userMorningRecords = {};
+    morningRangeRecords.forEach(record => {
+      if (!userMorningRecords[record.userName]) {
+        userMorningRecords[record.userName] = 0;
+      }
+      userMorningRecords[record.userName]++;
+    });
+    
+    // 输出每个用户的早上记录数
+    Object.entries(userMorningRecords).forEach(([userName, count]) => {
+      logger.info(`用户 ${userName} 在早上6:30-8:30范围内有 ${count} 条记录`);
+    });
     
     // 如果处理后没有记录，返回空结构
     if (allRecords.length === 0) {
