@@ -43,15 +43,17 @@ async function getAttendanceStats() {
     
     logger.info(`获取考勤统计，共 ${userIds.length} 个用户`);
     
-    // 设置日期范围（获取当前月的数据）
+    // 修改日期范围为上周一到上周日
     const today = moment();
-    // 修改为获取更长时间范围的数据，比如最近30天
-    const startDate = today.clone().subtract(30, 'days').format('YYYYMMDD');
-    const endDate = today.clone().format('YYYYMMDD');
+    const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
+    const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
     
-    logger.info(`获取 ${startDate} 至 ${endDate} 的考勤统计数据`);
+    const startDate = lastWeekMonday.format('YYYYMMDD');
+    const endDate = lastWeekSunday.format('YYYYMMDD');
     
-    // 构建请求体 - 完全匹配cURL和Python示例的格式
+    logger.info(`获取上周 ${startDate} 至 ${endDate} 的考勤统计数据`);
+    
+    // 构建请求体
     const requestBody = {
       current_group_only: true,
       end_date: parseInt(endDate),
@@ -198,7 +200,6 @@ async function getAttendanceStats() {
 }
 
 // 处理考勤统计数据
-// 处理考勤统计数据
 function processAttendanceStats(statsData) {
   try {
     // 检查API返回的数据结构
@@ -247,10 +248,20 @@ function processAttendanceStats(statsData) {
       logger.debug(`处理用户 ${userName}(${userId}) 的考勤统计`);
       
       // 获取日期记录（日期记录的code通常是日期格式，如"2025-03-10"）
-      const dateRecords = user.datas.filter(item => 
-        item.code.match(/^\d{4}-\d{2}-\d{2}$/) && 
-        item.title.includes('星期')
-      );
+      // 只过滤上周的日期记录
+      const dateRecords = user.datas.filter(item => {
+        if (!item.code.match(/^\d{4}-\d{2}-\d{2}$/) || !item.title.includes('星期')) {
+          return false;
+        }
+        
+        // 检查日期是否在上周范围内
+        const recordDate = moment(item.code);
+        const today = moment();
+        const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
+        const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
+        
+        return recordDate.isBetween(lastWeekMonday, lastWeekSunday, null, '[]');
+      });
       
       if (dateRecords.length === 0) {
         logger.debug(`用户 ${userName} 没有日期记录`);
@@ -308,11 +319,11 @@ function processAttendanceStats(statsData) {
     });
     
     logger.info(`共处理了 ${allRecords.length} 条考勤记录`);
-
+    
     // 统计在早上6:30-8:30范围内的记录数
     const morningRangeRecords = allRecords.filter(r => r.isInMorningRange);
     logger.info(`其中早上6:30-8:30范围内的记录有 ${morningRangeRecords.length} 条`);
-
+    
     // 统计每个用户在早上6:30-8:30范围内的记录数
     const userMorningRecords = {};
     morningRangeRecords.forEach(record => {
@@ -390,15 +401,15 @@ function processAttendanceStats(statsData) {
     
     // 构建最终结果
     const result = {
-      title: '早上6:30-8:30打卡记录排行榜',
+      title: '上周早上6:30-8:30打卡记录排行榜',
       period: {
-        start: startDate,
-        end: endDate
+        start: moment().subtract(1, 'weeks').startOf('isoWeek').format('YYYY-MM-DD'),
+        end: moment().subtract(1, 'weeks').endOf('isoWeek').format('YYYY-MM-DD')
       },
       departmentStats: departmentStats,
       rankingData: allRecords,
       summary: {
-        totalDays: [...new Set(allRecords.map(r => r.date))].length,
+        totalDays: 5, // 上周工作日数量，通常为5天
         totalRecords: allRecords.length,
         totalOnTime: allRecords.filter(r => !r.isLate).length,
         totalLate: allRecords.filter(r => r.isLate).length,
@@ -432,113 +443,3 @@ module.exports = {
   getAttendanceStatsData: getAttendanceStats,
   processAttendanceStatsData: processAttendanceStats
 };
-
-/* Performance optimization functions below */
-
-// Batch processing for large number of user IDs
-async function getAttendanceStatsInBatches() {
-  try {
-    logger.info('使用考勤统计API查询数据（分批处理）');
-    const token = await getAccessToken();
-    
-    // 使用固定的用户ID列表
-    const userIds = FIXED_USER_IDS;
-    const batchSize = 10; // 每批处理的用户数量
-    const batches = [];
-    
-    // 将用户ID分成多个批次
-    for (let i = 0; i < userIds.length; i += batchSize) {
-      batches.push(userIds.slice(i, i + batchSize));
-    }
-    
-    logger.info(`分批获取考勤统计，共 ${batches.length} 批，总计 ${userIds.length} 个用户`);
-    
-    // 设置日期范围
-    const today = moment();
-    const startDate = today.clone().subtract(30, 'days').format('YYYYMMDD');
-    const endDate = today.clone().format('YYYYMMDD');
-    
-    // 存储所有批次的结果
-    let allUserData = [];
-    
-    // 依次处理每个批次
-    for (let i = 0; i < batches.length; i++) {
-      const batchUserIds = batches[i];
-      logger.info(`处理第 ${i+1}/${batches.length} 批，包含 ${batchUserIds.length} 个用户`);
-      
-      // 构建请求体
-      const requestBody = {
-        current_group_only: true,
-        end_date: parseInt(endDate),
-        locale: "zh",
-        need_history: true,
-        start_date: parseInt(startDate),
-        stats_type: "month",
-        user_id: batchUserIds[0], // 使用批次中的第一个用户ID
-        user_ids: batchUserIds
-      };
-      
-      // 发送请求
-      const response = await axios({
-        method: 'post',
-        url: 'https://open.feishu.cn/open-apis/attendance/v1/user_stats_data/query',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        params: {
-          employee_type: 'employee_id'
-        },
-        data: requestBody,
-        timeout: 10000
-      });
-      
-      if (response.data.code === 0 && response.data.data && response.data.data.user_datas) {
-        // 合并用户数据
-        allUserData = allUserData.concat(response.data.data.user_datas);
-        logger.info(`成功获取第 ${i+1} 批数据，累计 ${allUserData.length} 个用户数据`);
-      } else {
-        logger.warn(`第 ${i+1} 批数据获取失败或为空: ${response.data.msg}`);
-      }
-      
-      // 添加延迟，避免API调用过于频繁
-      if (i < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    // 构建完整的返回数据结构
-    return {
-      user_datas: allUserData
-    };
-  } catch (error) {
-    logger.error('分批获取考勤统计数据出错:', error);
-    throw error;
-  }
-}
-
-// 添加缓存相关变量
-let attendanceDataCache = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 30 * 60 * 1000; // 缓存有效期30分钟
-
-// 获取考勤统计数据（带缓存）
-async function getAttendanceStatsWithCache() {
-  const now = Date.now();
-  
-  // 如果缓存有效，直接返回缓存数据
-  if (attendanceDataCache && (now - cacheTimestamp < CACHE_TTL)) {
-    logger.info('使用缓存的考勤统计数据，缓存时间：' + new Date(cacheTimestamp).toISOString());
-    return attendanceDataCache;
-  }
-  
-  // 缓存无效，重新获取数据
-  logger.info('缓存已过期或不存在，重新获取考勤统计数据');
-  const data = await getAttendanceStats();
-  
-  // 更新缓存
-  attendanceDataCache = data;
-  cacheTimestamp = now;
-  
-  return data;
-}

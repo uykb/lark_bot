@@ -137,7 +137,7 @@ function generateDepartmentElements(departmentStats) {
   return elements;
 }
 
-// 生成早起排名元素
+// 生成早起排名元素的函数
 function generateEarlyRankingElements(rankingData) {
   // 如果没有排名数据，返回提示信息
   if (!rankingData || rankingData.length === 0) {
@@ -152,6 +152,12 @@ function generateEarlyRankingElements(rankingData) {
   
   const elements = [];
   const rankingLimit = 5; // 显示前5名和后5名
+  
+  // 计算上周的工作日总数（通常为5天，如果有节假日可能更少）
+  const today = moment();
+  const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
+  const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
+  const workDaysInLastWeek = 5; // 默认为5个工作日，可以根据实际情况调整
   
   // 按用户分组，计算每个用户的平均打卡时间
   const userCheckInMap = {};
@@ -213,7 +219,8 @@ function generateEarlyRankingElements(rankingData) {
   // 生成前5名表格
   if (topFive.length > 0) {
     const topRows = topFive.map((user, index) => {
-      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
+      // 修改打卡天数显示格式为 "实际打卡天数/工作日总数"
+      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount}/${workDaysInLastWeek} |`;
     }).join('\n');
     
     elements.push({
@@ -235,7 +242,8 @@ function generateEarlyRankingElements(rankingData) {
   // 生成后5名表格
   if (bottomFive.length > 0) {
     const bottomRows = bottomFive.map((user, index) => {
-      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
+      // 修改打卡天数显示格式为 "实际打卡天数/工作日总数"
+      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount}/${workDaysInLastWeek} |`;
     }).join('\n');
     
     elements.push({
