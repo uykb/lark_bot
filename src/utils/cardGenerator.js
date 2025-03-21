@@ -108,34 +108,22 @@ function generateDepartmentElements(departmentStats) {
     ]
   });
   
-  // 计算每个部门的平均打卡时间并排序
+  // 计算每个部门的准时率并排序
   const departmentRanking = Object.values(departmentStats)
     .map(dept => {
-      // 计算部门所有用户的平均打卡时间
-      let totalMinutes = 0;
-      let totalRecords = 0;
-      Object.values(dept.users).forEach(user => {
-        user.checkInTimes && user.checkInTimes.forEach(time => {
-          const [hours, minutes] = time.split(':').map(Number);
-          totalMinutes += hours * 60 + minutes;
-          totalRecords++;
-        });
-      });
-      
-      const avgMinutes = totalRecords > 0 ? totalMinutes / totalRecords : 0;
-      const avgHours = Math.floor(avgMinutes / 60);
-      const avgMins = Math.floor(avgMinutes % 60);
+      const totalRecords = dept.totalOnTimeCount + dept.totalLateCount;
+      const ontimeRate = totalRecords > 0 ? 
+        (dept.totalOnTimeCount / totalRecords) * 100 : 
+        0;
       
       return {
         departmentName: dept.departmentName,
-        avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`
+        ontimeRate: ontimeRate,
+        totalOnTimeCount: dept.totalOnTimeCount,
+        totalRecords: totalRecords
       };
     })
-    .sort((a, b) => {
-      const [aHours, aMinutes] = a.avgCheckInTime.split(':').map(Number);
-      const [bHours, bMinutes] = b.avgCheckInTime.split(':').map(Number);
-      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
-    })
+    .sort((a, b) => b.ontimeRate - a.ontimeRate) // 按准时率降序排序
     .slice(0, 5); // 只取前5名
 
   // 生成部门排名表格
@@ -339,7 +327,7 @@ function generateEarlyRankingElements(rankingData) {
           }
         }
       ],
-      "rows": topFive.map(user => ({
+      "rows": userAverages.map(user => ({
         customer_scale: user.userId,
         customer_arr: user.avgCheckInTime,
         col_fuqy9yghbmc: user.department,
@@ -351,7 +339,7 @@ function generateEarlyRankingElements(rankingData) {
         "bold": true,
         "lines": 1
       },
-      "page_size": 5
+      "page_size": userAverages.length
     });
   }
   
@@ -414,7 +402,7 @@ function generateEarlyRankingElements(rankingData) {
           }
         }
       ],
-      "rows": bottomFive.map(user => ({
+      "rows": userAverages.map(user => ({
         customer_scale: user.userId,
         customer_arr: user.avgCheckInTime,
         col_fuqy9yghbmc: user.department,
@@ -426,7 +414,7 @@ function generateEarlyRankingElements(rankingData) {
         "bold": true,
         "lines": 1
       },
-      "page_size": 5
+      "page_size": userAverages.length
     });
   }
   
@@ -506,7 +494,7 @@ function generateEarlyRankingElements(rankingData) {
         "bold": true,
         "lines": 1
       },
-      "page_size": 5
+      "page_size": userAverages.length
     });
   }
   
