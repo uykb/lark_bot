@@ -157,7 +157,6 @@ function generateEarlyRankingElements(rankingData) {
   const today = moment();
   const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
   const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
-  const workDaysInLastWeek = 5; // 默认为5个工作日，可以根据实际情况调整
   
   // 按用户分组，计算每个用户的平均打卡时间
   const userCheckInMap = {};
@@ -172,7 +171,8 @@ function generateEarlyRankingElements(rankingData) {
         userName: record.userName,
         department: record.department,
         checkInTimes: [],
-        dates: []
+        dates: [],
+        lateCount: 0 // 添加迟到次数统计
       };
     }
     
@@ -181,6 +181,14 @@ function generateEarlyRankingElements(rankingData) {
     if (!dateExists) {
       userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
       userCheckInMap[record.userId].dates.push(record.date);
+      
+      // 统计迟到次数 (修改为8:00后算迟到，只统计上班卡)
+      if (record.checkInType === 'OnDuty' || !record.checkInType) { // 上班卡或未指定类型
+        const [hours, minutes] = record.checkInTime.split(':').map(Number);
+        if (hours > 8 || (hours === 8 && minutes > 0)) {
+          userCheckInMap[record.userId].lateCount++;
+        }
+      }
     }
   });
   
@@ -204,6 +212,7 @@ function generateEarlyRankingElements(rankingData) {
       department: user.department,
       avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`,
       checkInCount: user.checkInTimes.length,
+      lateCount: user.lateCount, // 添加迟到次数
       totalMinutes: avgMinutes // 用于排序
     };
   }).filter(Boolean);
@@ -219,8 +228,8 @@ function generateEarlyRankingElements(rankingData) {
   // 生成前5名表格
   if (topFive.length > 0) {
     const topRows = topFive.map((user, index) => {
-      // 修改打卡天数显示格式为 "实际打卡天数/工作日总数"
-      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount}/${workDaysInLastWeek} |`;
+      // 修改打卡天数显示格式，只显示实际打卡天数
+      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
     }).join('\n');
     
     elements.push({
@@ -242,8 +251,8 @@ function generateEarlyRankingElements(rankingData) {
   // 生成后5名表格
   if (bottomFive.length > 0) {
     const bottomRows = bottomFive.map((user, index) => {
-      // 修改打卡天数显示格式为 "实际打卡天数/工作日总数"
-      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount}/${workDaysInLastWeek} |`;
+      // 修改打卡天数显示格式，只显示实际打卡天数
+      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
     }).join('\n');
     
     elements.push({
@@ -251,6 +260,37 @@ function generateEarlyRankingElements(rankingData) {
       "text": {
         "tag": "lark_md",
         "content": `**最后${rankingLimit}名 (6:30-8:30)**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${bottomRows}`
+      }
+    });
+  }
+  
+  // 添加迟到次数排名
+  // 按迟到次数排序（从多到少）
+  const lateSorted = [...userAverages].sort((a, b) => b.lateCount - a.lateCount);
+  const topLateFive = lateSorted.slice(0, rankingLimit);
+  
+  if (topLateFive.length > 0 && topLateFive[0].lateCount > 0) {
+    elements.push({
+      "tag": "hr"
+    });
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "### ⏰ 迟到排名"
+      }
+    });
+    
+    const lateRows = topLateFive.map((user, index) => {
+      return `| ${index + 1} | ${user.userName} | ${user.department} | ${user.lateCount} |`;
+    }).join('\n');
+    
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": `**迟到次数前${rankingLimit}名**\n| 排名 | 姓名 | 部门 | 迟到次数 |\n| --- | --- | --- | --- |\n${lateRows}`
       }
     });
   }
