@@ -30,8 +30,8 @@ async function getAttendanceStats() {
       };
     }
     
-    // 使用固定的用户ID列表
-    const userIds = FIXED_USER_IDS;
+    // 使用配置文件中的用户ID列表
+    const userIds = USER_IDS;
     
     logger.info(`获取考勤统计，共 ${userIds.length} 个用户`);
     
