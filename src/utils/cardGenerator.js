@@ -192,7 +192,7 @@ function generateEarlyRankingElements(rankingData) {
         },
         {
           "tag": "plain_text",
-          "content": "暂无早起排名数据"
+          "content": "暂无上午打卡排名数据（6:30-8:30）"
         }
       ]
     }];
@@ -206,12 +206,27 @@ function generateEarlyRankingElements(rankingData) {
   const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
   const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
   
+  // 过滤出上周的数据
+  const lastWeekData = rankingData.filter(record => {
+    const recordDate = moment(record.date);
+    return recordDate.isBetween(lastWeekMonday, lastWeekSunday, 'day', '[]');
+  });
+  
   // 按用户分组，计算每个用户的平均打卡时间
   const userCheckInMap = {};
   
-  rankingData.forEach(record => {
-    // 只处理早上6:30-8:30之间的打卡记录
-    if (!record.isInMorningRange) return; // 跳过不在早上时间范围内的记录
+  lastWeekData.forEach(record => {
+    // 解析打卡时间
+    const [hours, minutes] = record.checkInTime.split(':').map(Number);
+    const checkInTimeInMinutes = hours * 60 + minutes;
+    
+    // 只处理上午时间段的打卡记录（6:30-8:30）
+    const morningStartTime = 6 * 60 + 30; // 6:30
+    const morningEndTime = 8 * 60 + 30;   // 8:30
+    
+    if (checkInTimeInMinutes < morningStartTime || checkInTimeInMinutes > morningEndTime) {
+      return; // 跳过不在上午时间范围内的记录
+    }
     
     if (!userCheckInMap[record.userId]) {
       userCheckInMap[record.userId] = {
@@ -220,8 +235,8 @@ function generateEarlyRankingElements(rankingData) {
         department: record.department,
         checkInTimes: [],
         dates: [],
-        lateCount: 0, // 添加迟到次数统计
-        lateDates: [] // 添加迟到日期记录
+        lateCount: 0,
+        lateDates: []
       };
     }
     
@@ -231,18 +246,16 @@ function generateEarlyRankingElements(rankingData) {
       userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
       userCheckInMap[record.userId].dates.push(record.date);
       
-      // 统计迟到次数 (修改为8:00后算迟到，只统计上班卡)
-      if (record.checkInType === 'OnDuty' || !record.checkInType) { // 上班卡或未指定类型
-        const [hours, minutes] = record.checkInTime.split(':').map(Number);
-        if (hours > 8 || (hours === 8 && minutes > 0)) {
-          userCheckInMap[record.userId].lateCount++;
-          userCheckInMap[record.userId].lateDates.push(record.date); // 记录迟到日期
-        }
+      // 统计迟到次数（8:00后算迟到）
+      const lateTime = 8 * 60; // 8:00
+      if (checkInTimeInMinutes > lateTime) {
+        userCheckInMap[record.userId].lateCount++;
+        userCheckInMap[record.userId].lateDates.push(record.date);
       }
     }
   });
   
-  // 计算平均打卡时间
+  // 计算平均打卡时间和迟到统计
   const userAverages = Object.values(userCheckInMap).map(user => {
     if (user.checkInTimes.length === 0) return null;
     
@@ -262,7 +275,8 @@ function generateEarlyRankingElements(rankingData) {
       department: user.department,
       avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`,
       checkInCount: user.checkInTimes.length,
-      lateCount: user.lateCount, // 添加迟到次数
+      lateCount: user.lateCount,
+      lateDates: user.lateDates,
       totalMinutes: avgMinutes // 用于排序
     };
   }).filter(Boolean);
