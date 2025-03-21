@@ -77,42 +77,108 @@ function generateDepartmentElements(departmentStats) {
   // 如果没有部门数据，返回提示信息
   if (!departmentStats || Object.keys(departmentStats).length === 0) {
     return [{
-      "tag": "div",
-      "text": {
-        "tag": "plain_text",
-        "content": "暂无部门统计数据"
-      }
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "standard_icon",
+          "token": "nearby-group_outlined"
+        },
+        {
+          "tag": "plain_text",
+          "content": "暂无部门统计数据"
+        }
+      ]
     }];
   }
   
   const elements = [];
   
-  // 计算每个部门的准时率并排序
+  // 添加部门统计标题
+  elements.push({
+    "tag": "note",
+    "elements": [
+      {
+        "tag": "standard_icon",
+        "token": "nearby-group_outlined"
+      },
+      {
+        "tag": "plain_text",
+        "content": "部门统计"
+      }
+    ]
+  });
+  
+  // 计算每个部门的平均打卡时间并排序
   const departmentRanking = Object.values(departmentStats)
     .map(dept => {
-      const totalCount = dept.totalOnTimeCount + dept.totalLateCount;
-      const onTimeRate = totalCount > 0 ? (dept.totalOnTimeCount / totalCount * 100).toFixed(1) : 0;
+      // 计算部门所有用户的平均打卡时间
+      let totalMinutes = 0;
+      let totalRecords = 0;
+      Object.values(dept.users).forEach(user => {
+        user.checkInTimes && user.checkInTimes.forEach(time => {
+          const [hours, minutes] = time.split(':').map(Number);
+          totalMinutes += hours * 60 + minutes;
+          totalRecords++;
+        });
+      });
+      
+      const avgMinutes = totalRecords > 0 ? totalMinutes / totalRecords : 0;
+      const avgHours = Math.floor(avgMinutes / 60);
+      const avgMins = Math.floor(avgMinutes % 60);
+      
       return {
         departmentName: dept.departmentName,
-        totalOnTimeCount: dept.totalOnTimeCount,
-        totalLateCount: dept.totalLateCount,
-        onTimeRate: parseFloat(onTimeRate)
+        avgCheckInTime: `${avgHours.toString().padStart(2, '0')}:${avgMins.toString().padStart(2, '0')}`
       };
     })
-    .sort((a, b) => b.onTimeRate - a.onTimeRate)
+    .sort((a, b) => {
+      const [aHours, aMinutes] = a.avgCheckInTime.split(':').map(Number);
+      const [bHours, bMinutes] = b.avgCheckInTime.split(':').map(Number);
+      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+    })
     .slice(0, 5); // 只取前5名
 
   // 生成部门排名表格
-  const rows = departmentRanking.map((dept, index) => {
-    return `| ${index + 1} | ${dept.departmentName} | ${dept.onTimeRate}% | ${dept.totalOnTimeCount} | ${dept.totalLateCount} |`;
-  }).join('\n');
-
   elements.push({
-    "tag": "div",
-    "text": {
-      "tag": "lark_md",
-      "content": `**部门准时率排名前五**\n| 排名 | 部门 | 准时率 | 准时次数 | 迟到次数 |\n| --- | --- | --- | --- | --- |\n${rows}`
-    }
+    "tag": "table",
+    "columns": [
+      {
+        "data_type": "number",
+        "name": "customer_name",
+        "display_name": "排名",
+        "horizontal_align": "right",
+        "width": "auto",
+        "format": {
+          "precision": 0
+        }
+      },
+      {
+        "data_type": "text",
+        "name": "customer_scale",
+        "display_name": "部门",
+        "horizontal_align": "left",
+        "width": "auto"
+      },
+      {
+        "data_type": "text",
+        "name": "col_x8gm00quem",
+        "display_name": "平均打卡时间",
+        "horizontal_align": "left",
+        "width": "auto"
+      }
+    ],
+    "rows": departmentRanking.map((dept, index) => ({
+      customer_name: index + 1,
+      customer_scale: dept.departmentName,
+      col_x8gm00quem: dept.avgCheckInTime
+    })),
+    "row_height": "low",
+    "header_style": {
+      "background_style": "none",
+      "bold": true,
+      "lines": 1
+    },
+    "page_size": 5
   });
   
   return elements;
@@ -123,11 +189,17 @@ function generateEarlyRankingElements(rankingData) {
   // 如果没有排名数据，返回提示信息
   if (!rankingData || rankingData.length === 0) {
     return [{
-      "tag": "div",
-      "text": {
-        "tag": "plain_text",
-        "content": "暂无早起排名数据"
-      }
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "standard_icon",
+          "token": "day_outlined"
+        },
+        {
+          "tag": "plain_text",
+          "content": "暂无早起排名数据"
+        }
+      ]
     }];
   }
   
@@ -210,17 +282,81 @@ function generateEarlyRankingElements(rankingData) {
   
   // 生成前5名表格
   if (topFive.length > 0) {
-    const topRows = topFive.map((user, index) => {
-      // 修改打卡天数显示格式，只显示实际打卡天数
-      return `| ${index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
-    }).join('\n');
+    elements.push({
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "standard_icon",
+          "token": "day_outlined"
+        },
+        {
+          "tag": "plain_text",
+          "content": "前5名早起之星"
+        }
+      ]
+    });
     
     elements.push({
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": `**前${rankingLimit}名早起之星 (6:30-8:30)**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${topRows}`
-      }
+      "tag": "table",
+      "columns": [
+        {
+          "data_type": "number",
+          "name": "customer_name",
+          "display_name": "排名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        },
+        {
+          "data_type": "persons",
+          "name": "customer_scale",
+          "display_name": "姓名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "customer_arr",
+          "display_name": "平均打卡时间",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "col_fuqy9yghbmc",
+          "display_name": "部门",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "number",
+          "name": "col_dp25d8er3w4",
+          "display_name": "打卡天数",
+          "horizontal_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        }
+      ],
+      "rows": topFive.map((user, index) => ({
+        customer_name: index + 1,
+        customer_scale: user.userId,
+        customer_arr: user.avgCheckInTime,
+        col_fuqy9yghbmc: user.department,
+        col_dp25d8er3w4: user.checkInCount
+      })),
+      "row_height": "low",
+      "header_style": {
+        "background_style": "none",
+        "bold": true,
+        "lines": 1
+      },
+      "page_size": 5
     });
   }
   
@@ -233,17 +369,81 @@ function generateEarlyRankingElements(rankingData) {
   
   // 生成后5名表格
   if (bottomFive.length > 0) {
-    const bottomRows = bottomFive.map((user, index) => {
-      // 修改打卡天数显示格式，只显示实际打卡天数
-      return `| ${userAverages.length - rankingLimit + index + 1} | ${user.userName} | ${user.avgCheckInTime} | ${user.department} | ${user.checkInCount} |`;
-    }).join('\n');
+    elements.push({
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "standard_icon",
+          "token": "expand-down_outlined"
+        },
+        {
+          "tag": "plain_text",
+          "content": "最后5名"
+        }
+      ]
+    });
     
     elements.push({
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": `**最后${rankingLimit}名 (6:30-8:30)**\n| 排名 | 姓名 | 平均打卡时间 | 部门 | 打卡天数 |\n| --- | --- | --- | --- | --- |\n${bottomRows}`
-      }
+      "tag": "table",
+      "columns": [
+        {
+          "data_type": "number",
+          "name": "customer_name",
+          "display_name": "排名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        },
+        {
+          "data_type": "persons",
+          "name": "customer_scale",
+          "display_name": "姓名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "customer_arr",
+          "display_name": "平均打卡时间",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "col_fuqy9yghbmc",
+          "display_name": "部门",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "number",
+          "name": "col_dp25d8er3w4",
+          "display_name": "打卡天数",
+          "horizontal_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        }
+      ],
+      "rows": bottomFive.map((user, index) => ({
+        customer_name: userAverages.length - rankingLimit + index + 1,
+        customer_scale: user.userId,
+        customer_arr: user.avgCheckInTime,
+        col_fuqy9yghbmc: user.department,
+        col_dp25d8er3w4: user.checkInCount
+      })),
+      "row_height": "low",
+      "header_style": {
+        "background_style": "none",
+        "bold": true,
+        "lines": 1
+      },
+      "page_size": 5
     });
   }
   
@@ -258,23 +458,72 @@ function generateEarlyRankingElements(rankingData) {
     });
     
     elements.push({
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": "### ⏰ 迟到排名"
-      }
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "standard_icon",
+          "token": "time_outlined"
+        },
+        {
+          "tag": "plain_text",
+          "content": "迟到排名"
+        }
+      ]
     });
     
-    const lateRows = topLateFive.map((user, index) => {
-      return `| ${index + 1} | ${user.userName} | ${user.department} | ${user.lateCount} |`;
-    }).join('\n');
-    
     elements.push({
-      "tag": "div",
-      "text": {
-        "tag": "lark_md",
-        "content": `**迟到次数前${rankingLimit}名**\n| 排名 | 姓名 | 部门 | 迟到次数 |\n| --- | --- | --- | --- |\n${lateRows}`
-      }
+      "tag": "table",
+      "columns": [
+        {
+          "data_type": "number",
+          "name": "customer_name",
+          "display_name": "排名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        },
+        {
+          "data_type": "persons",
+          "name": "customer_scale",
+          "display_name": "姓名",
+          "horizontal_align": "left",
+          "vertical_align": "center",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "col_fuqy9yghbmc",
+          "display_name": "部门",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "number",
+          "name": "col_dp25d8er3w4",
+          "display_name": "迟到次数",
+          "horizontal_align": "center",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        }
+      ],
+      "rows": topLateFive.map((user, index) => ({
+        customer_name: index + 1,
+        customer_scale: user.userId,
+        col_fuqy9yghbmc: user.department,
+        col_dp25d8er3w4: user.lateCount
+      })),
+      "row_height": "low",
+      "header_style": {
+        "background_style": "none",
+        "bold": true,
+        "lines": 1
+      },
+      "page_size": 5
     });
   }
   
