@@ -42,6 +42,7 @@
 - `APP_SECRET`: 飞书应用的 App Secret
 - `CRON_SCHEDULE`: 定时任务执行时间，默认为每周一上午9点（'0 1 * * 1'）
 - `WEBHOOK_URL`: 飞书群聊机器人的 Webhook 地址（可选，如不配置则使用应用消息发送）
+- `USER_IDS`: 需要参与统计的用户ID
 - `LOG_LEVEL`: 日志级别，可选值：debug、info、warn、error（默认：info）
 
 ### 3. 运行项目
