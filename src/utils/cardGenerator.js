@@ -206,49 +206,6 @@ function generateDepartmentElements(departmentStats) {
       "columns": [
         {
           "data_type": "text",
-          "name": "user_name",
-          "display_name": "姓名",
-          "horizontal_align": "left",
-          "width": "auto"
-        },
-        {
-          "data_type": "text",
-          "name": "department",
-          "display_name": "部门",
-          "horizontal_align": "left",
-          "width": "auto"
-        },
-        {
-          "data_type": "number",
-          "name": "late_count",
-          "display_name": "迟到次数",
-          "horizontal_align": "right",
-          "width": "auto",
-          "format": {
-            "precision": 0
-          }
-        }
-      ],
-      "rows": lateUsers.map(user => ({
-        "user_name": user.userName,
-        "department": user.department,
-        "late_count": user.lateCount
-      })),
-      "row_height": "low",
-      "header_style": {
-        "background_style": "none",
-        "bold": true,
-        "lines": 1
-      },
-      "page_size": 10
-    });
-
-    // 添加迟到人员表格
-    elements.push({
-      "tag": "table",
-      "columns": [
-        {
-          "data_type": "text",
           "name": "name",
           "display_name": "姓名",
           "horizontal_align": "left",
@@ -334,47 +291,62 @@ function generateEarlyRankingElements(rankingData) {
   // 按用户分组，计算每个用户的平均打卡时间和迟到次数
   const userCheckInMap = {};
   
+  // 先按日期和用户ID分组，找出每个用户每天最早的打卡时间
+  const dailyFirstCheckIn = {};
   lastWeekData.forEach(record => {
-    // 解析打卡时间
-    const [hours, minutes] = record.checkInTime.split(':').map(Number);
-    const checkInTimeInMinutes = hours * 60 + minutes;
-    
-    // 只处理上午时间段的打卡记录（6:30-8:30）
-    const morningStartTime = 6 * 60 + 30; // 6:30
-    const morningEndTime = 8 * 60 + 30;   // 8:30
-    const lateTime = 8 * 60;              // 8:00 迟到时间
-    
-    if (checkInTimeInMinutes < morningStartTime || checkInTimeInMinutes > morningEndTime) {
-      return; // 跳过不在上午时间范围内的记录
-    }
-    
-    // 判断是否迟到（8:00后算迟到）
-    const isLate = checkInTimeInMinutes > lateTime;
-    
-    if (!userCheckInMap[record.userId]) {
-      userCheckInMap[record.userId] = {
-        userId: record.userId,
-        userName: record.userName,
-        department: record.department,
-        checkInTimes: [],
-        dates: [],
-        lateDates: [],
-        lateCount: 0
-      };
-    }
-    
-    // 只记录每天第一次打卡
-    const dateExists = userCheckInMap[record.userId].dates.includes(record.date);
-    if (!dateExists) {
-      userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
-      userCheckInMap[record.userId].dates.push(record.date);
+      const key = `${record.userId}_${record.date}`;
+      const [hours, minutes] = record.checkInTime.split(':').map(Number);
+      const checkInTimeInMinutes = hours * 60 + minutes;
       
-      // 如果迟到，记录迟到信息
-      if (isLate) {
-        userCheckInMap[record.userId].lateDates.push(record.date);
-        userCheckInMap[record.userId].lateCount++;
+      if (!dailyFirstCheckIn[key] || checkInTimeInMinutes < dailyFirstCheckIn[key]) {
+          dailyFirstCheckIn[key] = checkInTimeInMinutes;
       }
-    }
+  });
+  
+  lastWeekData.forEach(record => {
+      // 解析打卡时间
+      const [hours, minutes] = record.checkInTime.split(':').map(Number);
+      const checkInTimeInMinutes = hours * 60 + minutes;
+      
+      // 只处理上午时间段的打卡记录（6:30-8:30）
+      const morningStartTime = 6 * 60 + 30; // 6:30
+      const morningEndTime = 8 * 60 + 30;   // 8:30
+      const lateTime = 8 * 60;              // 8:00 迟到时间
+      
+      if (checkInTimeInMinutes < morningStartTime || checkInTimeInMinutes > morningEndTime) {
+          return; // 跳过不在上午时间范围内的记录
+      }
+      
+      const key = `${record.userId}_${record.date}`;
+      const firstCheckInTime = dailyFirstCheckIn[key];
+      
+      // 判断是否迟到（当天第一次打卡在8:00后算迟到）
+      const isLate = firstCheckInTime > lateTime;
+      
+      if (!userCheckInMap[record.userId]) {
+          userCheckInMap[record.userId] = {
+              userId: record.userId,
+              userName: record.userName,
+              department: record.department,
+              checkInTimes: [],
+              dates: [],
+              lateDates: [],
+              lateCount: 0
+          };
+      }
+      
+      // 只记录每天第一次打卡
+      const dateExists = userCheckInMap[record.userId].dates.includes(record.date);
+      if (!dateExists) {
+          userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
+          userCheckInMap[record.userId].dates.push(record.date);
+          
+          // 如果迟到，记录迟到信息
+          if (isLate) {
+              userCheckInMap[record.userId].lateDates.push(record.date);
+              userCheckInMap[record.userId].lateCount++;
+          }
+      }
   });
   
   // 计算平均打卡时间和迟到统计
