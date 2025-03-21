@@ -14,16 +14,16 @@ const FIXED_USER_IDS = [
   "9c1b56ag", "2d6ddg17", "b8cg86bc", "f6e1287e"
 ];
 
-// 获取打卡记录并按时间排序
-async function getAttendanceRecords() {
+// 获取考勤统计数据
+async function getAttendanceStats() {
   try {
-    logger.info('使用真实数据模式，开始API查询');
+    logger.info('使用考勤统计API查询数据');
     const token = await getAccessToken();
     
     // 使用固定的用户ID列表
     const userIds = FIXED_USER_IDS;
     
-    logger.info(`获取打卡记录，共 ${userIds.length} 个用户`);
+    logger.info(`获取考勤统计，共 ${userIds.length} 个用户`);
     
     // 设置日期范围（获取当前月的数据）
     const today = moment();
@@ -31,44 +31,63 @@ async function getAttendanceRecords() {
     const startDate = today.clone().subtract(30, 'days').format('YYYYMMDD');
     const endDate = today.clone().format('YYYYMMDD');
     
-    logger.info(`获取 ${startDate} 至 ${endDate} 的打卡记录`);
+    logger.info(`获取 ${startDate} 至 ${endDate} 的考勤统计数据`);
     
-    // 构建请求体
+    // 构建请求体 - 完全匹配cURL和Python示例的格式
     const requestBody = {
-      check_date_from: parseInt(startDate),
-      check_date_to: parseInt(endDate),
-      need_overtime_result: true,
+      current_group_only: true,
+      end_date: parseInt(endDate),
+      locale: "zh",
+      need_history: true,
+      start_date: parseInt(startDate),
+      stats_type: "month",
+      user_id: "72a34568",
       user_ids: userIds
     };
     
     // 发送请求
-    logger.info(`发送考勤API请求: ${JSON.stringify(requestBody)}`);
+    logger.info(`发送考勤统计API请求: ${JSON.stringify(requestBody)}`);
     const response = await axios({
       method: 'post',
-      url: 'https://open.feishu.cn/open-apis/attendance/v1/user_tasks/query',
+      url: 'https://open.feishu.cn/open-apis/attendance/v1/user_stats_data/query',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       params: {
-        employee_type: 'employee_id',
-        ignore_invalid_users: true,
-        include_terminated_user: true
+        employee_type: 'employee_id'
       },
-      data: requestBody
+      data: requestBody,
+      // 添加超时设置，避免长时间等待
+      timeout: 10000,
+      // 添加重试配置
+      validateStatus: status => status < 500 // 只有服务器错误才会被视为失败
     });
     
     if (response.data.code === 0) {
-      logger.info(`成功获取打卡记录数据`);
+      logger.info(`成功获取考勤统计数据`);
       
       // 添加调试日志，查看完整的API响应
-      logger.debug('API响应数据', response.data);
+      if (process.env.LOG_LEVEL === 'debug') {
+        // 只记录关键信息，避免日志过大
+        const simplifiedResponse = {
+          code: response.data.code,
+          msg: response.data.msg,
+          user_count: response.data.data?.user_datas?.length || 0
+        };
+        logger.debug('API响应数据摘要', simplifiedResponse);
+        
+        // 如果需要完整日志，可以写入文件而不是控制台
+        if (process.env.LOG_FULL_RESPONSE === 'true') {
+          logger.debug('完整API响应数据', response.data);
+        }
+      }
       
       // 检查返回的数据结构
       if (!response.data.data) {
         logger.warn('API返回的数据缺少data字段');
         return {
-          title: '打卡记录排行榜',
+          title: '考勤统计排行榜',
           period: {
             start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
             end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
@@ -79,35 +98,46 @@ async function getAttendanceRecords() {
         };
       }
       
-      // 直接返回原始数据，让processAttendanceRecords处理
+      // 直接返回原始数据，让processAttendanceStats处理
       return response.data.data;
     } else {
-      // 删除多余的else语句，修复语法错误
-      logger.error(`获取打卡记录数据失败: ${response.data.msg}, 错误码: ${response.data.code}`);
+      logger.error(`获取考勤统计数据失败: ${response.data.msg}, 错误码: ${response.data.code}`);
       // 返回错误信息
       return {
-        title: '打卡记录获取失败',
+        title: '考勤统计获取失败',
         period: {
           start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
           end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
         },
         departmentStats: {},
         rankingData: [],
-        message: `获取打卡记录数据失败: ${response.data.msg}, 错误码: ${response.data.code}`
+        message: `获取考勤统计数据失败: ${response.data.msg}, 错误码: ${response.data.code}`
       };
     }
   } catch (error) {
-    logger.error('获取打卡记录数据出错:', error);
+    logger.error('获取考勤统计数据出错:', error);
     
     // 添加更详细的错误日志
     if (error.response) {
       logger.error(`状态码: ${error.response.status}`);
       logger.error(`响应数据: ${JSON.stringify(error.response.data)}`);
+      
+      // 处理特定错误码
+      if (error.response.data && error.response.data.code === 99991663) {
+        logger.error('API调用频率超限，将在稍后重试');
+        // 可以在这里添加重试逻辑
+      }
+    } else if (error.request) {
+      // 请求已发出但没有收到响应
+      logger.error('未收到API响应，可能是网络问题');
+    } else {
+      // 请求配置出错
+      logger.error('请求配置错误:', error.message);
     }
     
     // 返回错误信息
     return {
-      title: '打卡记录查询出错',
+      title: '考勤统计查询出错',
       period: {
         start: moment().subtract(30, 'days').format('YYYY-MM-DD'),
         end: moment().format('YYYY-MM-DD')
@@ -119,148 +149,117 @@ async function getAttendanceRecords() {
   }
 }
 
-// 处理打卡记录数据并按时间排序
-function processAttendanceRecords(recordsData) {
+// 处理考勤统计数据
+// 处理考勤统计数据
+function processAttendanceStats(statsData) {
   try {
-    // 提取用户打卡记录
-    const userTasks = recordsData.user_task_results || [];
+    // 检查API返回的数据结构
+    logger.debug('处理考勤统计数据', statsData);
     
-    // 如果没有打卡记录，返回空结构
-    if (userTasks.length === 0) {
-      logger.warn('没有找到打卡记录');
+    // 提取用户数据
+    const userData = statsData.user_datas || [];
+    
+    // 如果没有用户数据，返回空结构
+    if (userData.length === 0) {
+      logger.warn('没有找到用户数据');
       return {
-        title: '打卡记录排行榜',
+        title: '考勤统计排行榜',
         period: {
           start: moment().startOf('month').format('YYYY-MM-DD'),
           end: moment().format('YYYY-MM-DD')
         },
         departmentStats: {},
         rankingData: [],
-        message: '没有找到打卡记录'
+        message: '没有找到用户数据'
       };
     }
     
-    // 处理每个用户的打卡记录
+    // 处理每个用户的考勤统计
     let allRecords = [];
     
-    logger.info(`开始处理 ${userTasks.length} 个用户的打卡记录`);
+    logger.info(`开始处理 ${userData.length} 个用户的考勤统计`);
     
     // 添加调试日志，查看原始数据结构
-    logger.debug('用户任务数据结构示例', userTasks[0]);
+    if (userData.length > 0) {
+      logger.debug('用户数据结构示例', userData[0]);
+    }
     
-    userTasks.forEach(task => {
+    userData.forEach(user => {
       // 记录用户信息
-      const userName = task.employee_name || '未知';
-      const userId = task.user_id;
-      const department = task.group_name || '未知部门';
+      const userName = user.name || '未知';
+      const userId = user.user_id;
+      let department = '未知部门';
       
-      logger.debug(`处理用户 ${userName}(${userId}) 的打卡记录`);
+      // 从数据中提取部门信息
+      const deptData = user.datas.find(item => item.code === '50102');
+      if (deptData) {
+        department = deptData.value || '未知部门';
+      }
       
-      // 检查records字段是否存在
-      if (!task.records) {
-        logger.debug(`用户 ${userName} 的records字段不存在`);
+      logger.debug(`处理用户 ${userName}(${userId}) 的考勤统计`);
+      
+      // 获取日期记录（日期记录的code通常是日期格式，如"2025-03-10"）
+      const dateRecords = user.datas.filter(item => 
+        item.code.match(/^\d{4}-\d{2}-\d{2}$/) && 
+        item.title.includes('星期')
+      );
+      
+      if (dateRecords.length === 0) {
+        logger.debug(`用户 ${userName} 没有日期记录`);
         return; // 跳过这个用户
       }
       
-      // 只处理有记录的数据
-      if (task.records.length > 0) {
-        logger.debug(`用户 ${userName} 有 ${task.records.length} 条记录`);
-        
-        // 添加调试日志，查看记录结构
-        if (task.records.length > 0) {
-          logger.debug('记录数据结构示例', task.records[0]);
-        }
-        
-        task.records.forEach(record => {
-          try {
-            // 检查check_in_record字段是否存在
-            if (!record.check_in_record) {
-              logger.debug(`用户 ${userName} 的记录缺少check_in_record字段`);
-              return; // 跳过这条记录
-            }
-            
-            // 检查check_time字段是否存在
-            if (!record.check_in_record.check_time) {
-              logger.debug(`用户 ${userName} 的记录缺少check_time字段`);
-              return; // 跳过这条记录
-            }
-            
-            // 安全地解析时间戳
-            let checkInTime;
-            try {
-              checkInTime = parseInt(record.check_in_record.check_time);
-              if (isNaN(checkInTime)) {
-                logger.warn(`无效的打卡时间戳: ${record.check_in_record.check_time}`);
-                return; // 跳过这条记录
-              }
-              
-              // 添加调试信息，输出原始时间戳和转换后的时间
-              logger.debug(`原始时间戳: ${checkInTime}, 转换后时间: ${moment.unix(checkInTime).format('YYYY-MM-DD HH:mm:ss')}`);
-              
-              // 检查时间戳是否为毫秒级（如果是毫秒级，转换为秒级）
-              if (checkInTime > 10000000000) { // 大于10位数可能是毫秒级时间戳
-                logger.debug(`检测到毫秒级时间戳，转换为秒级`);
-                checkInTime = Math.floor(checkInTime / 1000);
-              }
-              
-              // 再次输出转换后的时间进行确认
-              logger.debug(`处理后时间戳: ${checkInTime}, 转换后时间: ${moment.unix(checkInTime).format('YYYY-MM-DD HH:mm:ss')}`);
-            } catch (e) {
-              logger.warn(`解析打卡时间戳出错: ${e.message}`);
-              return; // 跳过这条记录
-            }
-            
-            // 格式化日期和时间
-            const checkInMoment = moment.unix(checkInTime);
-            if (!checkInMoment.isValid()) {
-              logger.warn(`无效的时间戳转换: ${checkInTime}`);
-              return; // 跳过这条记录
-            }
-            
-            const checkInDate = checkInMoment.format('YYYY-MM-DD');
-            const checkInTimeFormatted = checkInMoment.format('HH:mm:ss');
-            
-            // 获取小时和分钟，用于判断是否在6:30-8:30之间
-            const hours = checkInMoment.hours();
-            const minutes = checkInMoment.minutes();
-            const totalMinutes = hours * 60 + minutes;
-            
-            // 判断是否在早上6:30-8:30之间 (6:30 = 390分钟, 8:30 = 510分钟)
-            const isInMorningRange = totalMinutes >= 390 && totalMinutes <= 510;
-            
-            // 添加更多调试信息
-            logger.debug(`用户 ${userName} 打卡时间: ${checkInTimeFormatted}, 小时: ${hours}, 分钟: ${minutes}, 总分钟: ${totalMinutes}, 是否在范围内: ${isInMorningRange}`);
-            
-            // 判断是否迟到
-            const isLate = record.check_in_result === 'Late';
-            
-            // 添加记录
-            allRecords.push({
-              date: checkInDate,
-              checkInTime: checkInTimeFormatted,
-              timestamp: checkInTime,
-              userName: userName,
-              userId: userId,
-              status: record.check_in_result || '未知',
-              location: record.check_in_record.location_name || '未知',
-              isLate: isLate,
-              department: department,
-              isInMorningRange: isInMorningRange,
-              totalMinutes: totalMinutes
-            });
-            
-            logger.debug(`添加打卡记录: ${checkInDate} ${checkInTimeFormatted} - ${userName} - 在早上6:30-8:30范围内: ${isInMorningRange}`);
-          } catch (recordError) {
-            logger.warn(`处理单条打卡记录时出错: ${recordError.message}`, recordError);
-            // 继续处理下一条记录
+      logger.debug(`用户 ${userName} 有 ${dateRecords.length} 条日期记录`);
+      
+      // 处理每一天的考勤记录
+      dateRecords.forEach(record => {
+        try {
+          const date = record.code; // 日期格式为 "2025-03-10"
+          const value = record.value; // 例如 "正常(07:50),正常(17:35)"
+          
+          // 改进打卡时间解析逻辑，专门提取第一次打卡时间（早上）
+          const checkInTimeMatch = value.split(',')[0].match(/\((\d{2}:\d{2})\)/);
+          if (!checkInTimeMatch) {
+            logger.debug(`用户 ${userName} 在 ${date} 没有有效的早上打卡记录`);
+            return; // 跳过这条记录
           }
-        });
-      } else {
-        logger.debug(`用户 ${userName} 没有打卡记录`);
-      }
+          
+          const firstCheckInTime = checkInTimeMatch[1] + ':00'; // 添加秒
+          
+          // 解析时间
+          const [hours, minutes] = firstCheckInTime.split(':').map(Number);
+          const totalMinutes = hours * 60 + minutes;
+          
+          // 判断是否在早上6:30-8:30之间 (6:30 = 390分钟, 8:30 = 510分钟)
+          const isInMorningRange = totalMinutes >= 390 && totalMinutes <= 510;
+          
+          // 判断是否异常（包括迟到）
+          const isAbnormal = record.features.some(f => 
+            f.key === 'Abnormal' && f.value === 'true'
+          );
+          
+          // 添加记录
+          allRecords.push({
+            date: date,
+            checkInTime: firstCheckInTime,
+            userName: userName,
+            userId: userId,
+            status: isAbnormal ? 'Abnormal' : 'Normal',
+            isLate: isAbnormal, // 简化处理，将异常视为迟到
+            department: department,
+            isInMorningRange: isInMorningRange,
+            totalMinutes: totalMinutes
+          });
+          
+          logger.debug(`添加考勤记录: ${date} ${firstCheckInTime} - ${userName} - 在早上6:30-8:30范围内: ${isInMorningRange}`);
+        } catch (recordError) {
+          logger.warn(`处理单条考勤记录时出错: ${recordError.message}`, recordError);
+          // 继续处理下一条记录
+        }
+      });
     });
     
-    logger.info(`共处理了 ${allRecords.length} 条打卡记录`);
+    logger.info(`共处理了 ${allRecords.length} 条考勤记录`);
 
     // 统计在早上6:30-8:30范围内的记录数
     const morningRangeRecords = allRecords.filter(r => r.isInMorningRange);
@@ -282,16 +281,16 @@ function processAttendanceRecords(recordsData) {
     
     // 如果处理后没有记录，返回空结构
     if (allRecords.length === 0) {
-      logger.warn('处理后没有有效的打卡记录');
+      logger.warn('处理后没有有效的考勤记录');
       return {
-        title: '打卡记录排行榜',
+        title: '考勤统计排行榜',
         period: {
           start: moment().startOf('month').format('YYYY-MM-DD'),
           end: moment().format('YYYY-MM-DD')
         },
         departmentStats: {},
         rankingData: [],
-        message: '处理后没有有效的打卡记录'
+        message: '处理后没有有效的考勤记录'
       };
     }
     
@@ -343,7 +342,7 @@ function processAttendanceRecords(recordsData) {
     
     // 构建最终结果
     const result = {
-      title: '早上6:30-8:30打卡记录排行榜', // 修改标题
+      title: '早上6:30-8:30打卡记录排行榜',
       period: {
         start: startDate,
         end: endDate
@@ -355,7 +354,7 @@ function processAttendanceRecords(recordsData) {
         totalRecords: allRecords.length,
         totalOnTime: allRecords.filter(r => !r.isLate).length,
         totalLate: allRecords.filter(r => r.isLate).length,
-        totalInMorningRange: allRecords.filter(r => r.isInMorningRange).length // 添加早上时间范围内的记录数
+        totalInMorningRange: allRecords.filter(r => r.isInMorningRange).length
       }
     };
     
@@ -376,12 +375,124 @@ function processAttendanceRecords(recordsData) {
   }
 }
 
+// 更新模块导出
 module.exports = {
-  getAttendanceRecords,
-  processAttendanceRecords,
-  // 为了保持兼容性，将旧的导出指向新的函数
-  getAttendanceData: getAttendanceRecords,
-  processAttendanceData: processAttendanceRecords,
-  getAttendanceStatsData: getAttendanceRecords,
-  processAttendanceStatsData: processAttendanceRecords
+  getAttendanceRecords: getAttendanceStats,
+  processAttendanceRecords: processAttendanceStats,
+  getAttendanceData: getAttendanceStats,
+  processAttendanceData: processAttendanceStats,
+  getAttendanceStatsData: getAttendanceStats,
+  processAttendanceStatsData: processAttendanceStats
 };
+
+// 3. 性能优化
+
+针对大量用户ID的情况，可以考虑分批请求：
+
+// 分批处理用户ID
+async function getAttendanceStatsInBatches() {
+  try {
+    logger.info('使用考勤统计API查询数据（分批处理）');
+    const token = await getAccessToken();
+    
+    // 使用固定的用户ID列表
+    const userIds = FIXED_USER_IDS;
+    const batchSize = 10; // 每批处理的用户数量
+    const batches = [];
+    
+    // 将用户ID分成多个批次
+    for (let i = 0; i < userIds.length; i += batchSize) {
+      batches.push(userIds.slice(i, i + batchSize));
+    }
+    
+    logger.info(`分批获取考勤统计，共 ${batches.length} 批，总计 ${userIds.length} 个用户`);
+    
+    // 设置日期范围
+    const today = moment();
+    const startDate = today.clone().subtract(30, 'days').format('YYYYMMDD');
+    const endDate = today.clone().format('YYYYMMDD');
+    
+    // 存储所有批次的结果
+    let allUserData = [];
+    
+    // 依次处理每个批次
+    for (let i = 0; i < batches.length; i++) {
+      const batchUserIds = batches[i];
+      logger.info(`处理第 ${i+1}/${batches.length} 批，包含 ${batchUserIds.length} 个用户`);
+      
+      // 构建请求体
+      const requestBody = {
+        current_group_only: true,
+        end_date: parseInt(endDate),
+        locale: "zh",
+        need_history: true,
+        start_date: parseInt(startDate),
+        stats_type: "month",
+        user_id: batchUserIds[0], // 使用批次中的第一个用户ID
+        user_ids: batchUserIds
+      };
+      
+      // 发送请求
+      const response = await axios({
+        method: 'post',
+        url: 'https://open.feishu.cn/open-apis/attendance/v1/user_stats_data/query',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        params: {
+          employee_type: 'employee_id'
+        },
+        data: requestBody,
+        timeout: 10000
+      });
+      
+      if (response.data.code === 0 && response.data.data && response.data.data.user_datas) {
+        // 合并用户数据
+        allUserData = allUserData.concat(response.data.data.user_datas);
+        logger.info(`成功获取第 ${i+1} 批数据，累计 ${allUserData.length} 个用户数据`);
+      } else {
+        logger.warn(`第 ${i+1} 批数据获取失败或为空: ${response.data.msg}`);
+      }
+      
+      // 添加延迟，避免API调用过于频繁
+      if (i < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // 构建完整的返回数据结构
+    return {
+      user_datas: allUserData
+    };
+  } catch (error) {
+    logger.error('分批获取考勤统计数据出错:', error);
+    throw error;
+  }
+}
+
+// 添加缓存相关变量
+let attendanceDataCache = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 30 * 60 * 1000; // 缓存有效期30分钟
+
+// 获取考勤统计数据（带缓存）
+async function getAttendanceStatsWithCache() {
+  const now = Date.now();
+  
+  // 如果缓存有效，直接返回缓存数据
+  if (attendanceDataCache && (now - cacheTimestamp < CACHE_TTL)) {
+    logger.info('使用缓存的考勤统计数据，缓存时间：' + new Date(cacheTimestamp).toISOString());
+    return attendanceDataCache;
+  }
+  
+  // 缓存无效，重新获取数据
+  logger.info('缓存已过期或不存在，重新获取考勤统计数据');
+  const data = await getAttendanceStats();
+  
+  // 更新缓存
+  attendanceDataCache = data;
+  cacheTimestamp = now;
+  
+  return data;
+}
