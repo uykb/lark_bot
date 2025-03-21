@@ -13,6 +13,14 @@
 - 🎨 美观的卡片消息展示
 - 🔧 高度可配置的统计规则
 
+## 技术栈
+
+- Node.js
+- 飞书开放平台 API
+- node-schedule（定时任务）
+- axios（HTTP 请求）
+- dotenv（环境变量管理）
+
 ## 部署步骤
 
 ### 1. 创建飞书应用
@@ -28,41 +36,80 @@
 
 ### 2. 配置环境变量
 
-在 replit  中配置以下环境变量：
+在 replit 中配置以下环境变量：
 
 - `APP_ID`: 飞书应用的 App ID
 - `APP_SECRET`: 飞书应用的 App Secret
-- `CHAT_ID`: 需要推送消息的群聊 ID
-- `ATTENDANCE_GROUP_ID`: 考勤组 ID
+- `CRON_SCHEDULE`: 定时任务执行时间，默认为每周一上午9点（'0 1 * * 1'）
+- `WEBHOOK_URL`: 飞书群聊机器人的 Webhook 地址（可选，如不配置则使用应用消息发送）
+- `LOG_LEVEL`: 日志级别，可选值：debug、info、warn、error（默认：info）
 
+### 3. 运行项目
 
-### 3. 定时任务
-项目默认配置为每周一上午 9:00（北京时间）自动运行，统计上周的考勤数据（工作日早上8:00上班打卡的考勤排名根据先后顺序排名，一般会在7:00-8:00区间，超过8:00的考勤计为迟到）。
+```bash
+# 安装依赖
+npm install
 
+# 启动项目
+npm start
+```
 
-## 技术栈
-- 参考文档
-- https://open.feishu.cn/document/home/course
-- https://feishu.feishu.cn/docx/S1pMdbckEooVlhx53ZMcGGnMnKc
-- 飞书应用开发包 (Lark App Engine)
-- 飞书开放平台 API
+## 配置说明
 
-接下来，以便用户了解所有可配置的环境变量：
+### 定时任务配置
 
-# 飞书应用凭证（必填）
-APP_ID=cli_xxxxxxxxxxxxxxxx
-APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+通过环境变量 `CRON_SCHEDULE` 配置，使用 cron 表达式格式：
 
-# 飞书群聊ID（必填）
-CHAT_ID=oc_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+┌───────────── 分钟 (0 - 59)
+│ ┌───────────── 小时 (0 - 23)
+│ │ ┌───────────── 日 (1 - 31)
+│ │ │ ┌───────────── 月 (1 - 12)
+│ │ │ │ ┌───────────── 星期 (0 - 6)（星期日为0）
+│ │ │ │ │
+│ │ │ │ │
+* * * * *
+```
 
-# 考勤组ID（必填）
-ATTENDANCE_GROUP_ID=xxxxxxxxxxxxxxxx
+示例：
+- 每周一上午9点：`0 1 * * 1`
+- 每天上午10点：`0 2 * * *`
+- 每周一和周四上午9点：`0 1 * * 1,4`
 
-# 消息配置（可选）
+### 统计规则配置
 
-# 节假日配置（可选，逗号分隔，周日不上班不用统计）
+考勤统计支持以下规则配置：
 
-# 日志配置（可选）
-LOG_LEVEL=info
-LOG_PREFIX=LarkAttendance
+- 工作时长计算：自动计算每日工作时长，支持考虑午休时间
+- 迟到早退判定：可配置弹性工作时间
+- 加班时长统计：支持节假日和周末加班统计
+- 请假统计：支持各类请假类型统计
+
+## 常见问题
+
+### Q: 如何修改消息推送模板？
+
+A: 在 `src/utils/cardGenerator.js` 文件中修改消息卡片模板。
+
+### Q: 如何调整统计时间范围？
+
+A: 在 `src/services/attendanceService.js` 中修改 `getAttendanceData` 函数的查询参数。
+
+### Q: 遇到 API 调用失败怎么办？
+
+A: 检查以下几点：
+1. 环境变量配置是否正确
+2. 应用权限是否已获得审批
+3. 查看日志中的详细错误信息
+
+## 贡献指南
+
+1. Fork 本仓库
+2. 创建功能分支：`git checkout -b feature/AmazingFeature`
+3. 提交更改：`git commit -m 'Add some AmazingFeature'`
+4. 推送分支：`git push origin feature/AmazingFeature`
+5. 提交 Pull Request
+
+## 许可证
+
+本项目基于 MIT 许可证开源，详见 [LICENSE](LICENSE) 文件。
