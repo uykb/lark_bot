@@ -322,9 +322,11 @@ function generateEarlyRankingElements(rankingData) {
   const lastWeekMonday = today.clone().subtract(1, 'weeks').startOf('isoWeek');
   const lastWeekSunday = lastWeekMonday.clone().endOf('isoWeek');
   
-  // 过滤出上周的数据
+  // 过滤出上周的数据（排除周日）
   const lastWeekData = rankingData.filter(record => {
     const recordDate = moment(record.date);
+    // 排除周日的记录
+    if (recordDate.day() === 0) return false;
     return recordDate.isBetween(lastWeekMonday, lastWeekSunday, 'day', '[]');
   });
   
