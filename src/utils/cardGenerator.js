@@ -327,7 +327,8 @@ function generateEarlyRankingElements(rankingData) {
     const recordDate = moment(record.date);
     // 排除周日的记录
     if (recordDate.day() === 0) return false;
-    return recordDate.isBetween(lastWeekMonday, lastWeekSunday, 'day', '[]');
+    // 只保留上周一到周六的记录
+    return recordDate.isBetween(lastWeekMonday, lastWeekSunday, 'day', '[]') && recordDate.day() !== 0;
   });
   
   // 按用户分组，计算每个用户的平均打卡时间和迟到次数
