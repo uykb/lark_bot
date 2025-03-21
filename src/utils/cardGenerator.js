@@ -284,7 +284,7 @@ function generateEarlyRankingElements(rankingData) {
         },
         {
           "tag": "plain_text",
-          "content": "前5名早起之星"
+          "content": "前10名早起之星"
         }
       ]
     });
