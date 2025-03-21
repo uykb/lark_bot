@@ -42,7 +42,7 @@ function generateCardContent(data) {
         "tag": "div",
         "text": {
           "tag": "lark_md",
-          "content": "### 🏢 部门统计"
+          "content": "🏢 部门统计"
         }
       },
       ...generateDepartmentElements(departmentStats),
@@ -54,7 +54,7 @@ function generateCardContent(data) {
         "tag": "div",
         "text": {
           "tag": "lark_md",
-          "content": "### 🌅 早起排名"
+          "content": "🌅 早起排名"
         }
       },
       ...generateEarlyRankingElements(rankingData),
@@ -143,16 +143,6 @@ function generateDepartmentElements(departmentStats) {
     "tag": "table",
     "columns": [
       {
-        "data_type": "number",
-        "name": "customer_name",
-        "display_name": "排名",
-        "horizontal_align": "right",
-        "width": "auto",
-        "format": {
-          "precision": 0
-        }
-      },
-      {
         "data_type": "text",
         "name": "customer_scale",
         "display_name": "部门",
@@ -161,17 +151,34 @@ function generateDepartmentElements(departmentStats) {
       },
       {
         "data_type": "text",
-        "name": "col_x8gm00quem",
-        "display_name": "平均打卡时间",
-        "horizontal_align": "left",
+        "name": "ontime_rate",
+        "display_name": "准时率",
+        "horizontal_align": "right",
         "width": "auto"
+      },
+      {
+        "data_type": "number",
+        "name": "ontime_count",
+        "display_name": "准时次数",
+        "horizontal_align": "right",
+        "width": "auto",
+        "format": {
+          "precision": 0
+        }
       }
     ],
-    "rows": departmentRanking.map((dept, index) => ({
-      customer_name: index + 1,
-      customer_scale: dept.departmentName,
-      col_x8gm00quem: dept.avgCheckInTime
-    })),
+    "rows": Object.values(departmentStats).map(dept => {
+      const totalRecords = dept.totalOnTimeCount + dept.totalLateCount;
+      const ontimeRate = totalRecords > 0 ? 
+        `${Math.round((dept.totalOnTimeCount / totalRecords) * 100)}%` : 
+        '0%';
+      
+      return {
+        customer_scale: dept.departmentName,
+        ontime_rate: ontimeRate,
+        ontime_count: dept.totalOnTimeCount
+      };
+    }),
     "row_height": "low",
     "header_style": {
       "background_style": "none",
@@ -300,17 +307,6 @@ function generateEarlyRankingElements(rankingData) {
       "tag": "table",
       "columns": [
         {
-          "data_type": "number",
-          "name": "customer_name",
-          "display_name": "排名",
-          "horizontal_align": "left",
-          "vertical_align": "center",
-          "width": "auto",
-          "format": {
-            "precision": 0
-          }
-        },
-        {
           "data_type": "persons",
           "name": "customer_scale",
           "display_name": "姓名",
@@ -343,8 +339,7 @@ function generateEarlyRankingElements(rankingData) {
           }
         }
       ],
-      "rows": topFive.map((user, index) => ({
-        customer_name: index + 1,
+      "rows": topFive.map(user => ({
         customer_scale: user.userId,
         customer_arr: user.avgCheckInTime,
         col_fuqy9yghbmc: user.department,
@@ -387,17 +382,6 @@ function generateEarlyRankingElements(rankingData) {
       "tag": "table",
       "columns": [
         {
-          "data_type": "number",
-          "name": "customer_name",
-          "display_name": "排名",
-          "horizontal_align": "left",
-          "vertical_align": "center",
-          "width": "auto",
-          "format": {
-            "precision": 0
-          }
-        },
-        {
           "data_type": "persons",
           "name": "customer_scale",
           "display_name": "姓名",
@@ -430,8 +414,7 @@ function generateEarlyRankingElements(rankingData) {
           }
         }
       ],
-      "rows": bottomFive.map((user, index) => ({
-        customer_name: userAverages.length - rankingLimit + index + 1,
+      "rows": bottomFive.map(user => ({
         customer_scale: user.userId,
         customer_arr: user.avgCheckInTime,
         col_fuqy9yghbmc: user.department,
