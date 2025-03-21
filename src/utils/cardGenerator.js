@@ -284,7 +284,7 @@ function generateEarlyRankingElements(rankingData) {
         },
         {
           "tag": "plain_text",
-          "content": "前10名早起之星"
+          "content": "早起之星排名"
         }
       ]
     });
@@ -341,14 +341,11 @@ function generateEarlyRankingElements(rankingData) {
     });
   }
   
-
-  
   // 添加迟到次数排名
   // 按迟到次数排序（从多到少）
   const lateSorted = [...userAverages].sort((a, b) => b.lateCount - a.lateCount);
-  const topLateFive = lateSorted.slice(0, rankingLimit);
   
-  if (topLateFive.length > 0 && topLateFive[0].lateCount > 0) {
+  if (lateSorted.length > 0 && lateSorted[0].lateCount > 0) {
     elements.push({
       "tag": "hr"
     });
@@ -407,7 +404,7 @@ function generateEarlyRankingElements(rankingData) {
           }
         }
       ],
-      "rows": topLateFive.map((user, index) => ({
+      "rows": lateSorted.map((user, index) => ({
         customer_name: index + 1,
         customer_scale: user.userId,
         col_fuqy9yghbmc: user.department,
@@ -419,7 +416,7 @@ function generateEarlyRankingElements(rankingData) {
         "bold": true,
         "lines": 1
       },
-      "page_size": userAverages.length
+      "page_size": 5
     });
   }
   
