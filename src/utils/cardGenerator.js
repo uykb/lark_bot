@@ -270,10 +270,8 @@ function generateEarlyRankingElements(rankingData) {
   // 按平均打卡时间排序
   userAverages.sort((a, b) => a.totalMinutes - b.totalMinutes);
   
-  // 获取前5名和后5名
+  // 获取前5名
   const topFive = userAverages.slice(0, rankingLimit);
-  const bottomFive = userAverages.length > rankingLimit ? 
-    userAverages.slice(-rankingLimit) : [];
   
   // 生成前5名表格
   if (topFive.length > 0) {
@@ -339,84 +337,11 @@ function generateEarlyRankingElements(rankingData) {
         "bold": true,
         "lines": 1
       },
-      "page_size": userAverages.length
+      "page_size": 10
     });
   }
   
-  // 添加分隔线
-  if (topFive.length > 0 && bottomFive.length > 0) {
-    elements.push({
-      "tag": "hr"
-    });
-  }
-  
-  // 生成后5名表格
-  if (bottomFive.length > 0) {
-    elements.push({
-      "tag": "note",
-      "elements": [
-        {
-          "tag": "standard_icon",
-          "token": "expand-down_outlined"
-        },
-        {
-          "tag": "plain_text",
-          "content": "最后5名"
-        }
-      ]
-    });
-    
-    elements.push({
-      "tag": "table",
-      "columns": [
-        {
-          "data_type": "persons",
-          "name": "customer_scale",
-          "display_name": "姓名",
-          "horizontal_align": "left",
-          "vertical_align": "center",
-          "width": "auto"
-        },
-        {
-          "data_type": "text",
-          "name": "customer_arr",
-          "display_name": "平均打卡时间",
-          "horizontal_align": "left",
-          "width": "auto"
-        },
-        {
-          "data_type": "text",
-          "name": "col_fuqy9yghbmc",
-          "display_name": "部门",
-          "horizontal_align": "left",
-          "width": "auto"
-        },
-        {
-          "data_type": "number",
-          "name": "col_dp25d8er3w4",
-          "display_name": "打卡天数",
-          "horizontal_align": "center",
-          "width": "auto",
-          "format": {
-            "precision": 0
-          }
-        }
-      ],
-      "rows": userAverages.map(user => ({
-        customer_scale: user.userId,
-        customer_arr: user.avgCheckInTime,
-        col_fuqy9yghbmc: user.department,
-        col_dp25d8er3w4: user.checkInCount
-      })),
-      "row_height": "low",
-      "header_style": {
-        "background_style": "none",
-        "bold": true,
-        "lines": 1
-      },
-      "page_size": userAverages.length
-    });
-  }
+
   
   // 添加迟到次数排名
   // 按迟到次数排序（从多到少）
