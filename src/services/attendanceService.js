@@ -20,6 +20,24 @@ async function getAttendanceStats() {
     logger.info('使用考勤统计API查询数据');
     const token = await getAccessToken();
     
+    // 记录获取到的token（隐藏部分内容以保护安全）
+    if (token) {
+      const maskedToken = token.substring(0, 5) + '...' + token.substring(token.length - 5);
+      logger.info(`成功获取访问令牌: ${maskedToken}`);
+    } else {
+      logger.error('获取访问令牌失败，令牌为空');
+      return {
+        title: '考勤统计获取失败',
+        period: {
+          start: moment().subtract(30, 'days').format('YYYY-MM-DD'),
+          end: moment().format('YYYY-MM-DD')
+        },
+        departmentStats: {},
+        rankingData: [],
+        message: '获取访问令牌失败，请检查授权配置'
+      };
+    }
+    
     // 使用固定的用户ID列表
     const userIds = FIXED_USER_IDS;
     
@@ -49,7 +67,8 @@ async function getAttendanceStats() {
     logger.info(`发送考勤统计API请求: ${JSON.stringify(requestBody)}`);
     const response = await axios({
       method: 'post',
-      url: 'https://open.feishu.cn/open-apis/attendance/v1/user_stats_data/query',
+      // 修正API URL，将data改为datas
+      url: 'https://open.feishu.cn/open-apis/attendance/v1/user_stats_datas/query',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -63,6 +82,28 @@ async function getAttendanceStats() {
       // 添加重试配置
       validateStatus: status => status < 500 // 只有服务器错误才会被视为失败
     });
+    
+    // 增强错误处理和日志记录
+    logger.debug(`API响应状态码: ${response.status}`);
+    logger.debug(`API响应头信息: ${JSON.stringify(response.headers)}`);
+    
+    // 检查响应是否包含预期的数据结构
+    if (!response.data) {
+      logger.error('API响应中没有data字段');
+      return {
+        title: '考勤统计获取失败',
+        period: {
+          start: moment(startDate, 'YYYYMMDD').format('YYYY-MM-DD'),
+          end: moment(endDate, 'YYYYMMDD').format('YYYY-MM-DD')
+        },
+        departmentStats: {},
+        rankingData: [],
+        message: 'API响应中没有data字段'
+      };
+    }
+    
+    // 记录完整的响应数据结构（不包含敏感数据）
+    logger.debug(`API响应数据结构: ${JSON.stringify(Object.keys(response.data))}`);
     
     if (response.data.code === 0) {
       logger.info(`成功获取考勤统计数据`);
@@ -101,7 +142,14 @@ async function getAttendanceStats() {
       // 直接返回原始数据，让processAttendanceStats处理
       return response.data.data;
     } else {
-      logger.error(`获取考勤统计数据失败: ${response.data.msg}, 错误码: ${response.data.code}`);
+      // 增强错误日志，确保记录所有可能的错误信息
+      const errorCode = response.data.code || '未知';
+      const errorMsg = response.data.msg || '未知错误';
+      logger.error(`获取考勤统计数据失败: ${errorMsg}, 错误码: ${errorCode}`);
+      
+      // 记录更多响应细节以便调试
+      logger.debug(`完整错误响应: ${JSON.stringify(response.data)}`);
+      
       // 返回错误信息
       return {
         title: '考勤统计获取失败',
@@ -111,7 +159,7 @@ async function getAttendanceStats() {
         },
         departmentStats: {},
         rankingData: [],
-        message: `获取考勤统计数据失败: ${response.data.msg}, 错误码: ${response.data.code}`
+        message: `获取考勤统计数据失败: ${errorMsg}, 错误码: ${errorCode}`
       };
     }
   } catch (error) {
