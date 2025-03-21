@@ -176,6 +176,122 @@ function generateDepartmentElements(departmentStats) {
     "page_size": 5
   });
   
+  // 添加迟到人员列表
+  const lateUsers = [];
+  Object.values(departmentStats).forEach(dept => {
+    dept.users.forEach(user => {
+      if (user.lateCount > 0) {
+        lateUsers.push({
+          userName: user.userName,
+          department: dept.departmentName,
+          lateCount: user.lateCount,
+          lateDates: user.lateDates || []
+        });
+      }
+    });
+  });
+
+  if (lateUsers.length > 0) {
+    elements.push({
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "⚠️ 迟到人员名单"
+      }
+    });
+    
+    // 添加迟到人员表格
+    elements.push({
+      "tag": "table",
+      "columns": [
+        {
+          "data_type": "text",
+          "name": "user_name",
+          "display_name": "姓名",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "department",
+          "display_name": "部门",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "number",
+          "name": "late_count",
+          "display_name": "迟到次数",
+          "horizontal_align": "right",
+          "width": "auto",
+          "format": {
+            "precision": 0
+          }
+        }
+      ],
+      "rows": lateUsers.map(user => ({
+        "user_name": user.userName,
+        "department": user.department,
+        "late_count": user.lateCount
+      })),
+      "row_height": "low",
+      "header_style": {
+        "background_style": "none",
+        "bold": true,
+        "lines": 1
+      },
+      "page_size": 10
+    });
+
+    // 添加迟到人员表格
+    elements.push({
+      "tag": "table",
+      "columns": [
+        {
+          "data_type": "text",
+          "name": "name",
+          "display_name": "姓名",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "department",
+          "display_name": "部门",
+          "horizontal_align": "left",
+          "width": "auto"
+        },
+        {
+          "data_type": "number",
+          "name": "late_count",
+          "display_name": "迟到次数",
+          "horizontal_align": "right",
+          "width": "auto"
+        },
+        {
+          "data_type": "text",
+          "name": "late_dates",
+          "display_name": "迟到日期",
+          "horizontal_align": "left",
+          "width": "auto"
+        }
+      ],
+      "rows": lateUsers.map(user => ({
+        name: user.userName,
+        department: user.department,
+        late_count: user.lateCount,
+        late_dates: user.lateDates.map(date => `${date}(${moment(date).format('dddd')})`).join('\n')
+      })),
+      "row_height": "low",
+      "header_style": {
+        "background_style": "none",
+        "bold": true,
+        "lines": 1
+      },
+      "page_size": 10
+    });
+  }
+
   return elements;
 }
 
@@ -212,7 +328,7 @@ function generateEarlyRankingElements(rankingData) {
     return recordDate.isBetween(lastWeekMonday, lastWeekSunday, 'day', '[]');
   });
   
-  // 按用户分组，计算每个用户的平均打卡时间
+  // 按用户分组，计算每个用户的平均打卡时间和迟到次数
   const userCheckInMap = {};
   
   lastWeekData.forEach(record => {
@@ -223,10 +339,14 @@ function generateEarlyRankingElements(rankingData) {
     // 只处理上午时间段的打卡记录（6:30-8:30）
     const morningStartTime = 6 * 60 + 30; // 6:30
     const morningEndTime = 8 * 60 + 30;   // 8:30
+    const lateTime = 8 * 60;              // 8:00 迟到时间
     
     if (checkInTimeInMinutes < morningStartTime || checkInTimeInMinutes > morningEndTime) {
       return; // 跳过不在上午时间范围内的记录
     }
+    
+    // 判断是否迟到（8:00后算迟到）
+    const isLate = checkInTimeInMinutes > lateTime;
     
     if (!userCheckInMap[record.userId]) {
       userCheckInMap[record.userId] = {
@@ -235,8 +355,8 @@ function generateEarlyRankingElements(rankingData) {
         department: record.department,
         checkInTimes: [],
         dates: [],
-        lateCount: 0,
-        lateDates: []
+        lateDates: [],
+        lateCount: 0
       };
     }
     
@@ -246,11 +366,10 @@ function generateEarlyRankingElements(rankingData) {
       userCheckInMap[record.userId].checkInTimes.push(record.checkInTime);
       userCheckInMap[record.userId].dates.push(record.date);
       
-      // 统计迟到次数（8:00后算迟到）
-      const lateTime = 8 * 60; // 8:00
-      if (checkInTimeInMinutes > lateTime) {
-        userCheckInMap[record.userId].lateCount++;
+      // 如果迟到，记录迟到信息
+      if (isLate) {
         userCheckInMap[record.userId].lateDates.push(record.date);
+        userCheckInMap[record.userId].lateCount++;
       }
     }
   });
@@ -454,7 +573,10 @@ function generateEarlyRankingElements(rankingData) {
     lateUsers.sort((a, b) => b.lateCount - a.lateCount);
     
     const lateListRows = lateUsers.map((user, index) => {
-      return `| ${index + 1} | ${user.userName} | ${user.department} | ${user.lateCount} | ${user.lateDates ? user.lateDates.join(', ') : '未记录'} |`;
+      const formattedDates = user.lateDates
+        ? user.lateDates.map(date => `${date}(${moment(date).format('dddd')})`).join('\n')
+        : '未记录';
+      return `| ${index + 1} | ${user.userName} | ${user.department} | ${user.lateCount} | ${formattedDates} |`;
     }).join('\n');
     
     elements.push({
