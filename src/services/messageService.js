@@ -158,7 +158,12 @@ async function sendMessageViaAPI(data, options = {}) {
       throw new Error('需要提供chatId或userId');
     }
     
-    logger.info(`准备发送消息到群聊: ${chatId}`);
+    // 记录发送目标信息
+    if (userId) {
+      logger.info(`准备发送消息到用户: ${userId}`);
+    } else {
+      logger.info(`准备发送消息到群聊: ${chatId}`);
+    }
     
     let messageContent;
     if (useCard) {
@@ -178,17 +183,33 @@ async function sendMessageViaAPI(data, options = {}) {
     }
     
     // 使用SDK发送消息
-    const response = await client.im.message.create({
-      params: {
-        receive_id_type: userId ? 'user_id' : 'chat_id'
-      },
-      data: {
-        receive_id: userId || chatId,
-        content: messageContent.content,
-        msg_type: messageContent.msg_type,
-        uuid: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // 验证用户ID格式
+    if (userId && !/^[0-9a-zA-Z_-]+$/.test(userId)) {
+      throw new Error(`无效的用户ID格式: ${userId}`);
+    }
+
+    try {
+      const response = await client.im.message.create({
+        params: {
+          receive_id_type: userId ? 'user_id' : 'chat_id'
+        },
+        data: {
+          receive_id: userId || chatId,
+          content: messageContent.content,
+          msg_type: messageContent.msg_type,
+          uuid: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }
+      });
+
+      if (!response.data) {
+        throw new Error('消息发送失败：未收到有效响应');
       }
-    });
+
+      return response;
+    } catch (error) {
+      logger.error(`消息发送失败: ${error.message}`);
+      throw new Error(`消息发送失败: ${error.message}`);
+    }
     
     // 记录消息ID和其他重要信息
     logger.info(`消息发送成功 - 消息ID: ${response.data.message_id}, 群组ID: ${response.data.chat_id}`);
