@@ -4,13 +4,28 @@ const { sendMessageViaWebhook, sendMessageViaAPI } = require('../src/services/me
 const { logger } = require('../src/utils/logger');
 
 module.exports = async (req, res) => {
+  // 验证触发密钥
+  const triggerKey = req.headers['x-trigger-key'] || req.query.key || req.body.key;
+  
+  // 如果是GET请求，返回简单页面
+  if (req.method === 'GET') {
+    if (!triggerKey || triggerKey !== process.env.TRIGGER_KEY) {
+      return res.status(401).send('触发密钥无效');
+    }
+    return res.send(`
+      <h1>手动触发考勤统计</h1>
+      <p>点击按钮开始触发：</p>
+      <form method="POST">
+        <input type="hidden" name="key" value="${triggerKey}">
+        <button type="submit">开始触发</button>
+      </form>
+    `);
+  }
+
   // 验证请求方法
   if (req.method !== 'POST') {
     return res.status(405).json({ error: '仅支持POST请求' });
   }
-
-  // 验证触发密钥
-  const triggerKey = req.headers['x-trigger-key'] || req.query.key;
   if (!triggerKey || triggerKey !== process.env.TRIGGER_KEY) {
     logger.warn('触发密钥验证失败');
     return res.status(401).json({ error: '触发密钥无效' });
