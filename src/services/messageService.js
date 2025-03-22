@@ -1,7 +1,14 @@
-const axios = require('axios');
-const { getAccessToken } = require('./authService');
+const lark = require('@larksuiteoapi/node-sdk');
 const { logger } = require('../utils/logger');
 const { generateCardContent } = require('../utils/cardGenerator');
+
+// 初始化飞书SDK客户端
+const client = new lark.Client({
+  appId: process.env.APP_ID,
+  appSecret: process.env.APP_SECRET,
+  disableTokenCache: false // 启用SDK的Token自动管理
+});
+
 
 // 通过Webhook发送消息
 async function sendMessageViaWebhook(data) {
@@ -137,14 +144,17 @@ function generateTextContent(data) {
 }
 
 // 通过飞书API发送消息
-async function sendMessageViaAPI(data) {
+async function sendMessageViaAPI(data, options = {}) {
   try {
-    const accessToken = await getAccessToken();
-    const chatId = process.env.CHAT_ID;
-    const useCard = process.env.USE_CARD !== 'false';
+    const {
+      chatId = process.env.CHAT_ID,
+      userId = process.env.DEFAULT_USER_ID,
+      useCard = process.env.USE_CARD !== 'false'
+    } = options;
     
-    if (!chatId) {
-      throw new Error('缺少CHAT_ID环境变量');
+    // 检查接收者ID
+    if (!chatId && !userId) {
+      throw new Error('需要提供chatId或userId');
     }
     
     logger.info(`准备发送消息到群聊: ${chatId}`);
@@ -154,38 +164,33 @@ async function sendMessageViaAPI(data) {
       // 使用卡片消息
       messageContent = {
         msg_type: 'interactive',
-        card: generateCardContent(data)
+        content: JSON.stringify(generateCardContent(data))
       };
     } else {
       // 使用文本消息
       messageContent = {
         msg_type: 'text',
-        content: {
+        content: JSON.stringify({
           text: generateTextContent(data)
-        }
+        })
       };
     }
     
-    // 发送消息
-    const response = await axios.post(
-      `https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id`,
-      {
-        receive_id: chatId,
-        ...messageContent
+    // 使用SDK发送消息
+    const response = await client.im.message.create({
+      params: {
+        receive_id_type: userId ? 'user_id' : 'chat_id'
       },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+      data: {
+        receive_id: userId || chatId,
+        content: messageContent.content,
+        msg_type: messageContent.msg_type,
+        uuid: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       }
-    );
+    });
     
-    if (response.data.code !== 0) {
-      throw new Error(`发送消息失败: ${response.data.msg}`);
-    }
-    
-    logger.info('消息发送成功');
+    // 记录消息ID和其他重要信息
+    logger.info(`消息发送成功 - 消息ID: ${response.data.message_id}, 群组ID: ${response.data.chat_id}`);
     
     // 如果有额外的群聊ID，也发送到这些群聊
     const additionalChatIds = process.env.ADDITIONAL_CHAT_IDS;
@@ -193,12 +198,12 @@ async function sendMessageViaAPI(data) {
       const chatIds = additionalChatIds.split(',');
       for (const id of chatIds) {
         if (id.trim()) {
-          await sendToChat(id.trim(), messageContent, accessToken);
+          await sendToChat(id.trim(), messageContent);
         }
       }
     }
     
-    return response.data;
+    return response;
   } catch (error) {
     logger.error('发送消息出错:', error);
     throw error;
@@ -206,45 +211,51 @@ async function sendMessageViaAPI(data) {
 }
 
 // 发送到特定群聊
-async function sendToChat(chatId, messageContent, accessToken) {
-  try {
-    logger.info(`发送消息到额外群聊: ${chatId}`);
-    
-    const response = await axios.post(
-      `https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id`,
-      {
-        receive_id: chatId,
-        ...messageContent
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+async function sendToChat(chatId, messageContent, retryCount = 3) {
+  let lastError = null;
+  for (let i = 0; i < retryCount; i++) {
+    try {
+      const response = await client.im.message.create({
+        params: {
+          receive_id_type: 'chat_id'
+        },
+        data: {
+          receive_id: chatId,
+          content: messageContent.content,
+          msg_type: messageContent.msg_type,
+          uuid: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         }
+      });
+      logger.info(`消息已发送到群组: ${chatId}`);
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (i < retryCount - 1) {
+        const delay = Math.pow(2, i) * 1000;
+        logger.warn(`发送消息到群组${chatId}失败，${i + 1}次重试，等待${delay}ms: ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-    );
-    
-    if (response.data.code !== 0) {
-      logger.warn(`发送消息到群聊 ${chatId} 失败: ${response.data.msg}`);
-    } else {
-      logger.info(`消息成功发送到群聊 ${chatId}`);
     }
-    
-    return response.data;
-  } catch (error) {
-    logger.error(`发送消息到群聊 ${chatId} 出错:`, error);
-    throw error;
   }
+  logger.error(`发送消息到群组${chatId}失败，重试次数已用完:`, lastError);
+  throw lastError;
 }
 
-// 根据环境变量选择发送方式
-async function sendMessage(data) {
-  // 如果配置了Webhook URL，优先使用Webhook发送
-  if (process.env.WEBHOOK_URL) {
+// 根据环境变量和参数选择发送方式
+async function sendMessage(data, options = {}) {
+  const {
+    useWebhook = process.env.WEBHOOK_URL ? true : false,
+    chatId,
+    userId,
+    useCard
+  } = options;
+
+  // 如果指定了使用Webhook或配置了Webhook URL且未指定其他发送方式
+  if (useWebhook && !userId) {
     return sendMessageViaWebhook(data);
   } else {
-    // 否则使用API发送
-    return sendMessageViaAPI(data);
+    // 使用API发送，支持指定用户ID或群组ID
+    return sendMessageViaAPI(data, { chatId, userId, useCard });
   }
 }
 
