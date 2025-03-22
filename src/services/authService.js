@@ -5,7 +5,7 @@ const { logger } = require('../utils/logger');
 async function getAccessToken() {
   try {
     const response = await axios.post('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
-      app_id: process.env.APP_ID,
+      app_id: process.env.app_id,
       app_secret: process.env.APP_SECRET
     });
     
