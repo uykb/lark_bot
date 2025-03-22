@@ -1,8 +1,8 @@
+// Vercel Cron Job 入口点
 require('dotenv').config();
-const { getAttendanceData, processAttendanceData } = require('./src/services/attendanceService');
-const { sendMessageViaWebhook, sendMessageViaAPI } = require('./src/services/messageService');
-const { logger } = require('./src/utils/logger');
-const { getCronSchedule } = require('./src/config/cronConfig');
+const { getAttendanceData, processAttendanceData } = require('../src/services/attendanceService');
+const { sendMessageViaWebhook, sendMessageViaAPI } = require('../src/services/messageService');
+const { logger } = require('../src/utils/logger');
 
 // 主函数 - 获取考勤数据并发送消息
 async function main() {
@@ -50,14 +50,14 @@ async function main() {
   }
 }
 
-// 导出为API路由处理函数
+// 导出为Vercel Serverless函数
 module.exports = async (req, res) => {
   try {
-    logger.info('API路由触发，开始执行考勤统计');
+    logger.info('Vercel Cron Job 触发，开始执行考勤统计');
     const result = await main();
     res.status(200).json(result);
   } catch (error) {
-    logger.error('API路由执行失败:', error);
+    logger.error('Vercel Cron Job 执行失败:', error);
     res.status(500).json({ error: error.message });
   }
 };
