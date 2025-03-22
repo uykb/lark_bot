@@ -22,10 +22,6 @@
     "APP_ID": "@app_id",
     "APP_SECRET": "@app_secret",
     "WEBHOOK_URL": "@webhook_url",
-    "CHAT_ID": "@chat_id",
-    "USER_IDS": "@user_ids",
-    "CRON_SCHEDULE": "@cron_schedule",
-    "LOG_LEVEL": "@log_level",
-    "TRIGGER_KEY": "@trigger_key"
+    "USER_IDS": "@user_ids"
   }
 }
