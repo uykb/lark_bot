@@ -1,4 +1,5 @@
 const lark = require('@larksuiteoapi/node-sdk');
+const axios = require('axios');
 const { logger } = require('../utils/logger');
 const { generateCardContent } = require('../utils/cardGenerator');
 
